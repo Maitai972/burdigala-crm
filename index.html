@@ -635,17 +635,30 @@ function cloudClient(){
   if(!url||!anon)return null;
   if(sb&&sb.__url===url&&sb.__anon===anon)return sb;
   if(typeof window.supabase==="undefined"||!window.supabase.createClient)return null;
-  try{sb=window.supabase.createClient(url,anon,{auth:{persistSession:true,autoRefreshToken:true}});sb.__url=url;sb.__anon=anon;}catch(e){sb=null;}
+  try{sb=window.supabase.createClient(url,anon,{auth:{persistSession:true,autoRefreshToken:true}});sb.__url=url;sb.__anon=anon;}catch(e){console.error("[cloudClient]",e);sb=null;}
   return sb;
 }
 function cloudMsg(m,err){const el=$("#cloudMsg");if(el){el.textContent=m||"";el.style.color=err?"var(--red)":"var(--muted)";}}
-function cloudShowSetup(){const a=$("#cloudSetup"),b=$("#cloudAuthOut"),c=$("#cloudAuthIn");if(!a)return;a.style.display="";b.style.display="none";c.style.display="none";}
+function cloudLsOk(){try{const k="__ls_test__";localStorage.setItem(k,"1");const ok=localStorage.getItem(k)==="1";localStorage.removeItem(k);return ok;}catch(e){return false;}}
+function cloudFailReason(){
+  if(!cloudLsOk())return "Votre navigateur ne conserve pas les données locales ici (navigation privée, ou réglage \"effacer les données à la fermeture\"). Configurez ça pour que la synchro fonctionne.";
+  if(!state.settings.cloudUrl||!state.settings.cloudAnon)return "Configuration non enregistrée.";
+  if(typeof window.supabase==="undefined")return "La bibliothèque de synchronisation ne s'est pas chargée (vérifiez votre connexion internet), rafraîchissez la page.";
+  return "Connexion au service impossible, vérifiez l'URL et la clé.";
+}
+function cloudShowSetup(){
+  const a=$("#cloudSetup"),b=$("#cloudAuthOut"),c=$("#cloudAuthIn");if(!a)return;
+  a.style.display="";b.style.display="none";c.style.display="none";
+  if($("#cUrl"))$("#cUrl").value=state.settings.cloudUrl||"";
+  if($("#cAnon"))$("#cAnon").value=state.settings.cloudAnon||"";
+  if(state.settings.cloudUrl||state.settings.cloudAnon)cloudMsg(cloudFailReason(),true);
+}
 async function cloudRefreshUI(){
   const setupEl=$("#cloudSetup");if(!setupEl)return;
   const client=cloudClient();
   if(!client){cloudShowSetup();return;}
   let session=null;
-  try{const r=await client.auth.getSession();session=r.data&&r.data.session;}catch(e){}
+  try{const r=await client.auth.getSession();session=r.data&&r.data.session;}catch(e){console.error("[cloudRefreshUI]",e);}
   const authOut=$("#cloudAuthOut"),authIn=$("#cloudAuthIn");
   setupEl.style.display="none";
   if(session){
@@ -654,12 +667,15 @@ async function cloudRefreshUI(){
     $("#cloudLastSync").textContent=state.settings.cloudLastSync?new Date(state.settings.cloudLastSync).toLocaleString("fr-FR"):"jamais";
   }else{
     authOut.style.display="";authIn.style.display="none";
+    if($("#cUrl"))$("#cUrl").value=state.settings.cloudUrl||"";
+    if($("#cAnon"))$("#cAnon").value=state.settings.cloudAnon||"";
   }
 }
 async function cloudPull(manual){
-  const client=cloudClient();if(!client)return;
-  let session=null;try{const r=await client.auth.getSession();session=r.data&&r.data.session;}catch(e){return;}
-  if(!session)return;
+  const client=cloudClient();
+  if(!client){if(manual)cloudMsg(cloudFailReason(),true);return;}
+  let session=null;try{const r=await client.auth.getSession();session=r.data&&r.data.session;}catch(e){if(manual)cloudMsg("Erreur de session : "+e.message,true);return;}
+  if(!session){if(manual)cloudMsg("Vous n'êtes pas connecté — reconnectez-vous.",true);return;}
   cloudPulling=true;
   try{
     const {data,error}=await client.from("burdigala_sync").select("data,updated_at").eq("user_id",session.user.id).maybeSingle();
@@ -736,9 +752,10 @@ $("#btnCloudLogout")&&$("#btnCloudLogout").addEventListener("click",async()=>{
 });
 $("#btnCloudPull")&&$("#btnCloudPull").addEventListener("click",()=>cloudPull(true));
 (async function cloudBoot(){
-  if(!cloudClient())return;
   await cloudRefreshUI();
-  let session=null;try{const r=await sb.auth.getSession();session=r.data&&r.data.session;}catch(e){}
+  const client=cloudClient();
+  if(!client)return;
+  let session=null;try{const r=await client.auth.getSession();session=r.data&&r.data.session;}catch(e){console.error("[cloudBoot]",e);}
   if(session){await cloudPull(false);cloudStartAutoSync();}
 })();
 
