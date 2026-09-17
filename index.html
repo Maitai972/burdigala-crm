@@ -692,7 +692,8 @@ function cloudCollect(){
     settings:{tarifAdj:state.settings.tarifAdj||{}}
   };
 }
-function cloudApply(payload){
+function cloudApply(payload,opts){
+  opts=opts||{};
   if(!payload||typeof payload!=="object")return;
   try{
     if(payload.mods){
@@ -705,7 +706,10 @@ function cloudApply(payload){
   state.settings.tarifAdj=(payload.settings&&payload.settings.tarifAdj)||{};
   syncFromModules();
   save();
-  ["devis","compta","calendrier","prospection"].forEach(refreshModuleFrame);
+  ["devis","compta","calendrier","prospection"].forEach(name=>{
+    if(opts.skipActive&&name===cur)return;
+    refreshModuleFrame(name);
+  });
   render();
 }
 async function cloudPull(manual){
@@ -718,7 +722,7 @@ async function cloudPull(manual){
     const {data,error}=await client.from("burdigala_sync").select("data,updated_at").eq("user_id",session.user.id).maybeSingle();
     if(error){if(manual)cloudMsg(error.message,true);return;}
     if(data&&data.data){
-      cloudApply(data.data);
+      cloudApply(data.data,{skipActive:!manual});
       state.settings.cloudLastSync=data.updated_at;
       try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}
       const el=$("#cloudLastSync");if(el)el.textContent=new Date(data.updated_at).toLocaleString("fr-FR");
