@@ -908,7 +908,24 @@ $("#topSync").addEventListener("click",()=>{goto("parametres");$("#fileSync").cl
 $("#btnSync").addEventListener("click",()=>$("#fileSync").click());
 $("#fileSync").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);const done=absorb(data);state.settings.lastSync=new Date().toISOString();save();render();toast(done.length?("Synchronisé : "+done.join(", ")):"Aucune donnée reconnue");}catch(x){toast("Fichier illisible");}};r.readAsText(f);e.target.value="";});
 $("#btnExport").addEventListener("click",()=>{const b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="centre-burdigala-"+iso(new Date())+".json";a.click();URL.revokeObjectURL(a.href);toast("Sauvegarde exportée");});
-$("#btnReset").addEventListener("click",()=>{if(confirm("Réinitialiser : effacer toutes les données du Centre ?")){state={clients:[],devis:[],factures:[],depenses:[],rdv:[],documents:[],activite:[],settings:{lastSync:null,siteConnected:false}};save();render();toast("Application réinitialisée");}});
+$("#btnReset").addEventListener("click",async()=>{
+  if(!confirm("Réinitialiser : effacer TOUTES les données (clients, devis, factures, missions, prospects) sur cet appareil, et dans le cloud si la synchronisation est active. Cette action est irréversible. Continuer ?"))return;
+  try{localStorage.removeItem("burdigala_mod_devis");}catch(e){}
+  try{localStorage.removeItem("burdigala_mod_compta");}catch(e){}
+  try{localStorage.removeItem("burdigala_mod_calendrier");}catch(e){}
+  try{localStorage.removeItem("burdigala_prospection_v1");}catch(e){}
+  const keepCloud={cloudUrl:state.settings.cloudUrl,cloudAnon:state.settings.cloudAnon,cloudLastSync:state.settings.cloudLastSync};
+  state={clients:[],devis:[],factures:[],depenses:[],rdv:[],documents:[],activite:[],settings:Object.assign({lastSync:null},keepCloud)};
+  save();
+  ["devis","compta","calendrier","prospection"].forEach(refreshModuleFrame);
+  render();
+  if(state.settings.cloudUrl){
+    const r=await cloudPush();
+    toast(r&&r.error?"Réinitialisé localement (échec de l'envoi au cloud : "+r.error.message+")":"Application réinitialisée (et synchronisée)");
+  }else{
+    toast("Application réinitialisée");
+  }
+});
 let tT;function toast(m){const t=$("#toast");t.textContent=m;t.className="toast show";clearTimeout(tT);tT=setTimeout(()=>t.className="toast",2400);}
 window.toast=toast;
 
