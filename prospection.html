@@ -261,6 +261,17 @@ function openEditor(id){
   if(f)openSheet(f);
 }
 
+function sendToAgenda(f){
+  try{
+    parent.postMessage({__prospRdv:{
+      id:"pr"+f.id,client:(f.nom||"")+(f.contact?(" — "+f.contact):""),commune:f.ville||"",
+      adresse:f.adresse||"",date:f.relance,heure:"09:00",
+      notes:"Relance prospection ("+lab(TYPES,f.type)+")"+(f.notes?(" — "+f.notes):"")
+    }},"*");
+    toast("Relance envoyée au calendrier");
+  }catch(err){toast("Calendrier indisponible");}
+}
+
 function renderCityGroups(){
   var host=$("#cityGroups");
   var q=$("#q").value.trim().toLowerCase(),fs=$("#fStat").value;
@@ -284,7 +295,7 @@ function renderCityGroups(){
         '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
         '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
         '<td data-l="Statut"><span class="tag st-'+esc(f.statut)+'">'+esc(lab(STATUTS,f.statut))+"</span></td>"+
-        '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">📞 Appeler</a>':"")+'<button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
+        '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">📞 Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+f.id+'">Agenda</button>':"")+'<button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
         "</tr>";
     }).join("");
     return '<div class="city-group">'+
@@ -362,8 +373,14 @@ $("#citySearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.pr
 $("#cityGroups").addEventListener("click",function(e){
   var h=e.target.closest(".city-h");
   if(h){var v=h.getAttribute("data-city");if(openCities.has(v))openCities.delete(v);else openCities.add(v);renderCityGroups();return;}
-  var b=e.target.closest("button[data-edit]");
-  if(b)openEditor(b.getAttribute("data-edit"));
+  var editBtn=e.target.closest("button[data-edit]");
+  if(editBtn){openEditor(editBtn.getAttribute("data-edit"));return;}
+  var calBtn=e.target.closest("button[data-cal]");
+  if(calBtn){
+    var id=calBtn.getAttribute("data-cal"),f=null;
+    for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+    if(f)sendToAgenda(f);
+  }
 });
 
 var editing=null;
@@ -423,14 +440,7 @@ $("#rows").addEventListener("click",function(e){
   var f=null;for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
   if(!f)return;
   if(b.hasAttribute("data-edit")){openSheet(f);return;}
-  try{
-    parent.postMessage({__prospRdv:{
-      id:"pr"+f.id,client:(f.nom||"")+(f.contact?(" — "+f.contact):""),commune:f.ville||"",
-      adresse:f.adresse||"",date:f.relance,heure:"09:00",
-      notes:"Relance prospection ("+lab(TYPES,f.type)+")"+(f.notes?(" — "+f.notes):"")
-    }},"*");
-    toast("Relance envoyée au calendrier");
-  }catch(err){toast("Calendrier indisponible");}
+  sendToAgenda(f);
 });
 
 render();

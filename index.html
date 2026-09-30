@@ -1124,6 +1124,13 @@ function computeNotifications(){
       out.push({id:"rfact-"+f.id,cat:"relance",icon:"bell",title:"Relancer la facture "+(f.num||"")+(f.client?(" — "+f.client):""),sub:"Impayée depuis "+joursDepuis(f.date)+" j",go:"compta"});
     }
   });
+  let prospRaw=null;try{prospRaw=JSON.parse(localStorage.getItem("burdigala_prospection_v1")||"[]");}catch(e){prospRaw=[];}
+  (Array.isArray(prospRaw)?prospRaw:[]).forEach(p=>{
+    if(p.relance&&p.relance<=today&&p.statut!=="client"&&p.statut!=="sans_suite"){
+      const late=joursDepuis(p.relance);
+      out.push({id:"prosp-"+p.id,cat:"relance",icon:"bell",title:"Relancer "+(p.nom||"—")+(p.statut==="rdv"?" (RDV)":""),sub:[p.ville,late>0?("en retard de "+late+" j"):"prévue aujourd'hui"].filter(Boolean).join(" · "),go:"prospection"});
+    }
+  });
   return out.filter(n=>!dismissed.includes(n.id));
 }
 const NOTIF_ICONS={cal:'<path d="M3.5 5h17v15.5H3.5z"></path><path d="M3.5 9.5h17M8 3v3.5M16 3v3.5"></path>',clock:'<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3 2"></path>',bell:'<path d="M12 3.5c-3.2 0-5.7 2.5-5.7 5.7v3.1c0 .6-.2 1.2-.6 1.7l-1.2 1.5c-.6.8 0 2 1 2h13c1 0 1.6-1.2 1-2l-1.2-1.5c-.4-.5-.6-1.1-.6-1.7V9.2c0-3.2-2.5-5.7-5.7-5.7Z"></path>'};
