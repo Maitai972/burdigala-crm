@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prospection</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --ink:#3A3F3B; --ink-2:#4C514D; --muted:#6E736F; --line:#E3E6E1;
@@ -51,7 +52,25 @@ tbody tr:hover{background:#FAFBF9;}
 .st-interesse{background:#FBF0DC;color:#7A5A16;}
 .st-client{background:#E6F2DC;color:#3D6B21;}
 .st-sans_suite{background:#F2E6E6;color:#7A3A3A;}
+.st-rdv{background:#EAE3F7;color:#5B3FA6;}
+.st-a_rappeler{background:#FBEEDC;color:#A6620E;}
 .late{color:#A0392F;font-weight:700;}
+.section-h{font-size:15px;font-weight:700;color:var(--ink);margin:24px 0 10px;}
+.search-panel{padding:16px 18px;margin-bottom:14px;}
+.search-bar{display:flex;gap:9px;flex-wrap:wrap;}
+.search-bar .search{flex:1;min-width:200px;}
+.search-status{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;font-weight:600;padding:9px 12px;border-radius:9px;}
+.search-status.loading{background:#EAF1F8;color:#2F5480;}
+.search-status.error{background:#F2E6E6;color:#7A3A3A;}
+.search-status.empty{background:#EEF1EC;color:var(--ink-2);}
+.search-status.ok{background:#E6F2DC;color:#3D6B21;}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(47,84,128,.25);border-top-color:#2F5480;animation:spin .7s linear infinite;flex:0 0 auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.city-group{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(26,31,28,.06);overflow:hidden;margin-bottom:12px;}
+.city-h{width:100%;text-align:left;background:#FAFBF9;border:none;border-bottom:1px solid var(--line);padding:13px 16px;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit;}
+.city-h:hover{background:#F2F5EE;}
+.city-b table{width:100%;}
+.city-caret{font-size:10px;color:var(--muted);width:10px;display:inline-block;}
 .acts{display:flex;gap:6px;justify-content:flex-end;}
 .empty{padding:34px 20px;text-align:center;color:var(--muted);}
 .scrim{position:fixed;inset:0;background:rgba(22,26,23,.5);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40;}
@@ -100,8 +119,20 @@ textarea.inp{resize:vertical;min-height:72px;}
     <div class="kpi"><div class="n" id="kInt">0</div><div class="l">Intéressés</div></div>
     <div class="kpi"><div class="n" id="kCli">0</div><div class="l">Devenus clients</div></div>
     <div class="kpi"><div class="n" id="kRel">0</div><div class="l">Relances dues</div></div>
+    <div class="kpi"><div class="n" id="kVilles">0</div><div class="l">Villes prospectées</div></div>
   </div>
 
+  <div class="panel search-panel">
+    <div class="search-bar">
+      <input class="inp search" id="citySearch" placeholder="🔎 Rechercher une ville... (ex. Bordeaux)">
+      <button class="btn primary" id="citySearchBtn">Rechercher</button>
+    </div>
+    <div class="search-status" id="searchStatus" style="display:none"></div>
+  </div>
+
+  <div id="cityGroups"></div>
+
+  <div class="section-h">Toutes les fiches</div>
   <div class="bar">
     <input class="inp search" id="q" placeholder="Rechercher un nom, un secteur, un contact, une ville…">
     <select class="inp" id="fType"><option value="">Tous les types</option></select>
@@ -134,8 +165,9 @@ textarea.inp{resize:vertical;min-height:72px;}
       <input class="inp" id="f_adresse" placeholder="12 rue Notre-Dame"></div>
     <div class="row2">
       <div class="field"><label for="f_ville">Ville</label><input class="inp" id="f_ville" placeholder="Bordeaux"></div>
-      <div class="field"><label for="f_canal">Canal</label><select class="inp" id="f_canal"></select></div>
+      <div class="field"><label for="f_tel">Téléphone</label><input class="inp" id="f_tel" placeholder="05 56 00 00 00"></div>
     </div>
+    <div class="field"><label for="f_canal">Canal</label><select class="inp" id="f_canal"></select></div>
     <div class="row2">
       <div class="field"><label for="f_date">Date de visite</label><input class="inp" type="date" id="f_date"></div>
       <div class="field"><label for="f_relance">Prochaine relance</label><input class="inp" type="date" id="f_relance"></div>
@@ -157,7 +189,10 @@ var KEY="burdigala_prospection_v1";
 var $=function(s){return document.querySelector(s);};
 var TYPES=[["agence","Agence immobilière"],["bailleur","Bailleur social"],["porte","Secteur porte-à-porte"],["particulier","Particulier"],["pro","Autre pro"]];
 var CANAUX=[["visite","Visite"],["appel","Appel"],["mail","Mail"],["porte","Porte-à-porte"]];
-var STATUTS=[["a_contacter","À contacter"],["contacte","Contacté"],["interesse","Intéressé"],["client","Client"],["sans_suite","Sans suite"]];
+var STATUTS=[["a_contacter","À contacter"],["contacte","Contactée"],["interesse","Intéressée"],["rdv","Rendez-vous"],["client","Client"],["sans_suite","Pas intéressée"],["a_rappeler","À rappeler"]];
+var SB_URL="https://joaqpgxsjlidvaadeyyu.supabase.co";
+var SB_ANON="sb_publishable_DEjtghTSM-fliRQKIX5Tpg_7TzF0Yk5";
+var openCities=new Set();
 function lab(list,v){for(var i=0;i<list.length;i++)if(list[i][0]===v)return list[i][1];return v||"—";}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 function iso(d){return d.toISOString().slice(0,10);}
@@ -187,6 +222,11 @@ function render(){
   $("#kInt").textContent=n("interesse");
   $("#kCli").textContent=n("client");
   $("#kRel").textContent=fiches.filter(function(f){return f.relance&&f.relance<=today&&f.statut!=="client"&&f.statut!=="sans_suite";}).length;
+  var villesSet={};
+  fiches.forEach(function(f){if(f.type==="agence"&&f.ville)villesSet[f.ville]=1;});
+  $("#kVilles").textContent=Object.keys(villesSet).length;
+
+  renderCityGroups();
 
   var q=$("#q").value.trim().toLowerCase(),ft=$("#fType").value,fs=$("#fStat").value;
   var list=fiches.filter(function(f){
@@ -216,6 +256,116 @@ function render(){
   }).join("");
 }
 
+function openEditor(id){
+  var f=null;for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+  if(f)openSheet(f);
+}
+
+function renderCityGroups(){
+  var host=$("#cityGroups");
+  var q=$("#q").value.trim().toLowerCase(),fs=$("#fStat").value;
+  var agences=fiches.filter(function(f){return f.type==="agence";});
+  if(fs)agences=agences.filter(function(f){return f.statut===fs;});
+  if(q)agences=agences.filter(function(f){return [f.nom,f.contact,f.ville,f.adresse,f.notes].join(" ").toLowerCase().indexOf(q)>-1;});
+  if(!agences.length){
+    host.innerHTML='<div class="panel"><div class="empty">'+(fiches.some(function(f){return f.type==="agence";})?"Aucune agence ne correspond aux filtres.":"Recherche une ville ci-dessus pour trouver des agences immobilières.")+"</div></div>";
+    return;
+  }
+  var byVille={};
+  agences.forEach(function(f){var v=f.ville||"Ville inconnue";(byVille[v]=byVille[v]||[]).push(f);});
+  var villes=Object.keys(byVille).sort(function(a,b){return byVille[b].length-byVille[a].length||a.localeCompare(b);});
+  host.innerHTML=villes.map(function(v){
+    var list=byVille[v].sort(function(a,b){return (a.nom||"").localeCompare(b.nom||"");});
+    var open=openCities.has(v);
+    var rows=list.map(function(f){
+      var tel=(f.tel||"").trim();
+      return '<tr>'+
+        '<td data-l="Agence"><span class="nm">'+esc(f.nom||"—")+"</span></td>"+
+        '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
+        '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
+        '<td data-l="Statut"><span class="tag st-'+esc(f.statut)+'">'+esc(lab(STATUTS,f.statut))+"</span></td>"+
+        '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">📞 Appeler</a>':"")+'<button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
+        "</tr>";
+    }).join("");
+    return '<div class="city-group">'+
+      '<button type="button" class="city-h" data-city="'+esc(v)+'"><span class="city-caret">'+(open?"▼":"▶")+"</span>"+esc(v)+" — "+list.length+" agence"+(list.length>1?"s":"")+"</button>"+
+      '<div class="city-b" style="display:'+(open?"block":"none")+'"><table><thead><tr><th>Agence</th><th>Téléphone</th><th>Adresse</th><th>Statut</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>"+
+      "</div>";
+  }).join("");
+}
+
+function setSearchStatus(kind,msg){
+  var el=$("#searchStatus");
+  if(!kind){el.style.display="none";el.className="search-status";return;}
+  el.className="search-status "+kind;
+  el.innerHTML=(kind==="loading"?'<span class="spin"></span>':"")+"<span>"+esc(msg)+"</span>";
+  el.style.display="flex";
+}
+
+var sbClient=null;
+function getSbClient(){
+  if(sbClient)return sbClient;
+  if(typeof window.supabase==="undefined"||!window.supabase.createClient)return null;
+  try{sbClient=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage,storageKey:"burdigala_sb_auth"}});}catch(e){sbClient=null;}
+  return sbClient;
+}
+
+var searching=false;
+function searchCity(villeRaw){
+  var ville=(villeRaw||"").trim();
+  if(!ville||searching)return;
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){
+    setSearchStatus("error","Hors connexion — impossible de lancer une nouvelle recherche. Les fiches déjà enregistrées restent consultables ci-dessous.");
+    return;
+  }
+  var client=getSbClient();
+  if(!client){setSearchStatus("error","Service de recherche indisponible (connexion au CRM impossible).");return;}
+  searching=true;
+  $("#citySearchBtn").disabled=true;
+  setSearchStatus("loading","Recherche des agences à "+ville+"…");
+  (async function(){
+    try{
+      var sess=null;
+      try{var r=await client.auth.getSession();sess=r.data&&r.data.session;}catch(e){}
+      if(!sess){setSearchStatus("error","Connecte-toi depuis le tableau de bord du CRM pour rechercher des agences.");return;}
+      var res=await client.functions.invoke("search-agences",{body:{ville:ville}});
+      if(res.error)throw res.error;
+      var results=(res.data&&res.data.results)||[];
+      if(!results.length){setSearchStatus("empty","Aucune agence trouvée pour « "+ville+" ».");return;}
+      var added=0,updated=0;
+      results.forEach(function(r){
+        var existing=r.placeId?fiches.find(function(f){return f.placeId===r.placeId;}):null;
+        if(existing){
+          existing.nom=r.nom||existing.nom;existing.tel=r.tel||existing.tel;existing.adresse=r.adresse||existing.adresse;
+          existing.cp=r.cp||existing.cp;existing.ville=r.ville||existing.ville;
+          updated++;
+        }else{
+          fiches.push({id:uid(),type:"agence",nom:r.nom||"—",contact:"",adresse:r.adresse||"",ville:r.ville||ville,cp:r.cp||"",tel:r.tel||"",canal:"visite",date:"",relance:"",statut:"a_contacter",notes:"",placeId:r.placeId||null,source:"api"});
+          added++;
+        }
+      });
+      persist();
+      openCities.add(results[0].ville||ville);
+      render();
+      setSearchStatus("ok",results.length+" agence(s) trouvée(s) à "+ville+" — "+added+" nouvelle(s), "+updated+" mise(s) à jour.");
+    }catch(err){
+      setSearchStatus("error","Erreur lors de la recherche : "+((err&&err.message)||"service indisponible")+".");
+    }finally{
+      searching=false;
+      $("#citySearchBtn").disabled=false;
+    }
+  })();
+}
+
+$("#citySearchBtn").addEventListener("click",function(){searchCity($("#citySearch").value);});
+$("#citySearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchCity($("#citySearch").value);}});
+$("#cityGroups").addEventListener("click",function(e){
+  var h=e.target.closest(".city-h");
+  if(h){var v=h.getAttribute("data-city");if(openCities.has(v))openCities.delete(v);else openCities.add(v);renderCityGroups();return;}
+  var b=e.target.closest("button[data-edit]");
+  if(b)openEditor(b.getAttribute("data-edit"));
+});
+
 var editing=null;
 function openSheet(f){
   editing=f?f.id:null;
@@ -225,6 +375,7 @@ function openSheet(f){
   $("#f_contact").value=f?(f.contact||""):"";
   $("#f_adresse").value=f?(f.adresse||""):"";
   $("#f_ville").value=f?(f.ville||""):"";
+  $("#f_tel").value=f?(f.tel||""):"";
   $("#f_canal").value=f?(f.canal||"visite"):"visite";
   $("#f_date").value=f?(f.date||""):iso(new Date());
   $("#f_relance").value=f?(f.relance||""):"";
@@ -248,7 +399,7 @@ $("#sheet").addEventListener("submit",function(e){
   e.preventDefault();
   var o={
     type:$("#f_type").value,nom:$("#f_nom").value.trim(),contact:$("#f_contact").value.trim(),
-    adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),canal:$("#f_canal").value,
+    adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),tel:$("#f_tel").value.trim(),canal:$("#f_canal").value,
     date:$("#f_date").value,relance:$("#f_relance").value,statut:$("#f_statut").value,notes:$("#f_notes").value.trim()
   };
   if(!o.nom){$("#f_nom").focus();return;}
