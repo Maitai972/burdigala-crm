@@ -12,8 +12,9 @@
   --grad:linear-gradient(180deg,#343835 0%,#4C514D 18%,#6E736F 38%,#9DA29E 62%,#C4C8C4 82%,#D8DBD7 100%);
 }
 *{box-sizing:border-box;}
-html{background:var(--grad);background-attachment:fixed;min-height:100%;}
+html{margin:0;}
 body{margin:0;background:transparent;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;}
+.app-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--grad);}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:14px 18px;margin-bottom:18px;box-shadow:0 6px 24px rgba(26,31,28,.05);flex-wrap:wrap;}
 .brand{display:flex;align-items:center;gap:12px;}
@@ -27,6 +28,8 @@ h1{margin:0;font-size:26px;line-height:1.15;color:#fff;letter-spacing:-.01em;}
 .sub{margin:6px 0 0;color:rgba(255,255,255,.8);font-size:13.5px;}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:20px 0;}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:0 4px 18px rgba(26,31,28,.06);}
+.kpi-click{font-family:inherit;text-align:left;cursor:pointer;transition:border-color .14s,box-shadow .14s;}
+.kpi-click:hover{border-color:var(--green);box-shadow:0 6px 20px rgba(26,31,28,.1);}
 .kpi .n{font-size:24px;font-weight:700;color:var(--ink);}
 .kpi .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:2px;}
 .bar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:14px;}
@@ -99,6 +102,7 @@ textarea.inp{resize:vertical;min-height:72px;}
 </style>
 </head>
 <body>
+<div class="app-bg" aria-hidden="true"></div>
 <div class="wrap">
   <div class="topbar">
     <div class="brand">
@@ -114,12 +118,12 @@ textarea.inp{resize:vertical;min-height:72px;}
   </div>
 
   <div class="kpis">
-    <div class="kpi"><div class="n" id="kTot">0</div><div class="l">Fiches</div></div>
-    <div class="kpi"><div class="n" id="kTodo">0</div><div class="l">À contacter</div></div>
-    <div class="kpi"><div class="n" id="kInt">0</div><div class="l">Intéressés</div></div>
-    <div class="kpi"><div class="n" id="kCli">0</div><div class="l">Devenus clients</div></div>
-    <div class="kpi"><div class="n" id="kRel">0</div><div class="l">Relances dues</div></div>
-    <div class="kpi"><div class="n" id="kVilles">0</div><div class="l">Villes prospectées</div></div>
+    <button type="button" class="kpi kpi-click" id="kTotBtn"><div class="n" id="kTot">0</div><div class="l">Fiches</div></button>
+    <button type="button" class="kpi kpi-click" id="kTodoBtn"><div class="n" id="kTodo">0</div><div class="l">À contacter</div></button>
+    <button type="button" class="kpi kpi-click" id="kIntBtn"><div class="n" id="kInt">0</div><div class="l">À rappeler</div></button>
+    <button type="button" class="kpi kpi-click" id="kCliBtn"><div class="n" id="kCli">0</div><div class="l">Devenus clients</div></button>
+    <button type="button" class="kpi kpi-click" id="kRelBtn"><div class="n" id="kRel">0</div><div class="l">Pas intéressé</div></button>
+    <button type="button" class="kpi kpi-click" id="kVillesBtn"><div class="n" id="kVilles">0</div><div class="l">Villes prospectées</div></button>
   </div>
 
   <div class="panel search-panel">
@@ -219,9 +223,9 @@ function render(){
   $("#kTot").textContent=fiches.length;
   var n=function(s){return fiches.filter(function(f){return f.statut===s;}).length;};
   $("#kTodo").textContent=n("a_contacter");
-  $("#kInt").textContent=n("interesse");
+  $("#kInt").textContent=n("a_rappeler");
   $("#kCli").textContent=n("client");
-  $("#kRel").textContent=fiches.filter(function(f){return f.relance&&f.relance<=today&&f.statut!=="client"&&f.statut!=="sans_suite";}).length;
+  $("#kRel").textContent=n("sans_suite");
   var villesSet={};
   fiches.forEach(function(f){if(f.type==="agence"&&f.ville)villesSet[f.ville]=1;});
   $("#kVilles").textContent=Object.keys(villesSet).length;
@@ -251,7 +255,7 @@ function render(){
       '<td data-l="Canal">'+esc(lab(CANAUX,f.canal))+"</td>"+
       '<td data-l="Statut"><span class="tag st-'+esc(f.statut)+'">'+esc(lab(STATUTS,f.statut))+"</span></td>"+
       '<td data-l="Relance">'+rel+"</td>"+
-      '<td><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+f.id+'">Agenda</button>':"")+'<button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
+      '<td><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+f.id+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+f.id+'">📋 Devis</button><button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
       "</tr>";
   }).join("");
 }
@@ -265,11 +269,20 @@ function sendToAgenda(f){
   try{
     parent.postMessage({__prospRdv:{
       id:"pr"+f.id,client:(f.nom||"")+(f.contact?(" — "+f.contact):""),commune:f.ville||"",
-      adresse:f.adresse||"",date:f.relance,heure:"09:00",
+      adresse:f.adresse||"",tel:f.tel||"",date:f.relance,heure:"09:00",
       notes:"Relance prospection ("+lab(TYPES,f.type)+")"+(f.notes?(" — "+f.notes):"")
     }},"*");
     toast("Relance envoyée au calendrier");
   }catch(err){toast("Calendrier indisponible");}
+}
+
+function createDevisFromFiche(f){
+  try{
+    parent.postMessage({__prospToDevis:{
+      nom:(f.nom||"")+(f.contact?(" — "+f.contact):""),
+      tel:f.tel||"",adresse:f.adresse||"",ville:f.ville||""
+    }},"*");
+  }catch(err){toast("Devis indisponible");}
 }
 
 function renderCityGroups(){
@@ -295,7 +308,7 @@ function renderCityGroups(){
         '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
         '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
         '<td data-l="Statut"><span class="tag st-'+esc(f.statut)+'">'+esc(lab(STATUTS,f.statut))+"</span></td>"+
-        '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">📞 Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+f.id+'">Agenda</button>':"")+'<button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
+        '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">📞 Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+f.id+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+f.id+'">📋 Devis</button><button class="btn sm" data-edit="'+f.id+'">Ouvrir</button></div></td>'+
         "</tr>";
     }).join("");
     return '<div class="city-group">'+
@@ -380,6 +393,13 @@ $("#cityGroups").addEventListener("click",function(e){
     var id=calBtn.getAttribute("data-cal"),f=null;
     for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
     if(f)sendToAgenda(f);
+    return;
+  }
+  var devisBtn=e.target.closest("button[data-devis]");
+  if(devisBtn){
+    var did=devisBtn.getAttribute("data-devis"),df=null;
+    for(var j=0;j<fiches.length;j++)if(fiches[j].id===did)df=fiches[j];
+    if(df)createDevisFromFiche(df);
   }
 });
 
@@ -411,6 +431,12 @@ $("#scrim").addEventListener("click",closeSheet);
 $("#q").addEventListener("input",render);
 $("#fType").addEventListener("change",render);
 $("#fStat").addEventListener("change",render);
+$("#kTotBtn").addEventListener("click",function(){$("#fStat").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kTodoBtn").addEventListener("click",function(){$("#fStat").value="a_contacter";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kIntBtn").addEventListener("click",function(){$("#fStat").value="a_rappeler";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kCliBtn").addEventListener("click",function(){$("#fStat").value="client";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kRelBtn").addEventListener("click",function(){$("#fStat").value="sans_suite";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kVillesBtn").addEventListener("click",function(){$("#fStat").value="";$("#q").value="";render();document.getElementById("cityGroups").scrollIntoView({behavior:"smooth",block:"start"});});
 
 $("#sheet").addEventListener("submit",function(e){
   e.preventDefault();
@@ -421,11 +447,13 @@ $("#sheet").addEventListener("submit",function(e){
   };
   if(!o.nom){$("#f_nom").focus();return;}
   if(editing){
+    o.id=editing;
     fiches=fiches.map(function(f){return f.id===editing?Object.assign({},f,o):f;});
   }else{
     o.id=uid();fiches.push(o);
   }
-  persist();render();closeSheet();toast("Fiche enregistrée");
+  persist();render();closeSheet();
+  if(o.relance)sendToAgenda(o);else toast("Fiche enregistrée");
 });
 
 $("#del").addEventListener("click",function(){
@@ -436,10 +464,11 @@ $("#del").addEventListener("click",function(){
 
 $("#rows").addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
-  var id=b.getAttribute("data-edit")||b.getAttribute("data-cal");
+  var id=b.getAttribute("data-edit")||b.getAttribute("data-cal")||b.getAttribute("data-devis");
   var f=null;for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
   if(!f)return;
   if(b.hasAttribute("data-edit")){openSheet(f);return;}
+  if(b.hasAttribute("data-devis")){createDevisFromFiche(f);return;}
   sendToAgenda(f);
 });
 
