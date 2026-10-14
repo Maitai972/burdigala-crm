@@ -292,6 +292,21 @@ button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;curso
 .trajet .pi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .trajet .tj-from{font-weight:500;color:#5C7F45;}
 .trajet.wait{color:var(--muted);background:#F2F4F7;border-color:var(--line);font-weight:500;}
+/* Listes : actions sur plusieurs lignes plutôt que débordement ; textes longs coupés */
+.acts{flex-wrap:wrap;}
+td{overflow-wrap:anywhere;}
+.city-h .city-t{min-width:0;overflow-wrap:anywhere;}
+.region-h .region-t{min-width:0;overflow-wrap:anywhere;}
+.toast{width:max-content;max-width:calc(100vw - 32px);text-align:center;}
+.city-h:focus-visible,.region-h:focus-visible,.rtab:focus-visible,.kpi-click:focus-visible,.tag-btn:focus-visible,.x:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+@media(max-width:760px){
+  td{align-items:flex-start;}
+  td > *:not(.acts){text-align:right;}
+  td[data-l=""]:before{display:none;}
+  td:before{flex:0 0 auto;white-space:nowrap;overflow-wrap:normal;}
+  .rtab{white-space:normal;text-align:left;}
+  .sheet .row2{grid-template-columns:1fr;}
+}
 @media (max-width:640px){.trajet{margin-left:24px;}.trajet .tj-from{display:none;}.region-h .region-m{margin-left:0;}.region-h{flex-wrap:wrap;}}
 </style>
 </head>
@@ -322,15 +337,15 @@ button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;curso
 
   <div class="panel search-panel">
     <div class="search-bar">
-      <input class="inp search" id="citySearch" placeholder="Ville, département ou région (ex. Bordeaux, Landes, Occitanie)">
-      <select class="inp zone-nb" id="zoneNb" title="Nombre de villes prospectées pour une région ou un département"><option value="5">5 villes</option><option value="10" selected>10 villes</option><option value="15">15 villes</option><option value="20">20 villes</option><option value="30">30 villes</option></select>
+      <input class="inp search" id="citySearch" type="search" aria-label="Ville, département ou région à prospecter" placeholder="Ville, département ou région (ex. Bordeaux, Landes, Occitanie)">
+      <select class="inp zone-nb" id="zoneNb" aria-label="Nombre de villes à prospecter" title="Nombre de villes prospectées pour une région ou un département"><option value="5">5 villes</option><option value="10" selected>10 villes</option><option value="15">15 villes</option><option value="20">20 villes</option><option value="30">30 villes</option></select>
       <button class="btn primary" id="citySearchBtn">Rechercher agences et mandataires</button>
     </div>
     <div class="zone-hint">Pour une région ou un département, ses principales villes sont prospectées une à une. Les résultats sont rangés par département puis par ville, avec le temps de route depuis Mérignac.</div>
-    <div class="search-status" id="searchStatus" style="display:none"></div>
+    <div class="search-status" id="searchStatus" style="display:none" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="result-tabs" id="resultTabs">
+  <div class="result-tabs" id="resultTabs" role="group" aria-label="Résultats de recherche">
     <button type="button" class="rtab active" id="tabAgence" data-tab="agence">Agences immobilières <span class="cnt" id="cntAgence">0</span></button>
     <button type="button" class="rtab" id="tabMand" data-tab="mandataire">Mandataires immobiliers <span class="cnt" id="cntMand">0</span></button>
   </div>
@@ -339,14 +354,14 @@ button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;curso
 
   <div class="section-h">Toutes les fiches</div>
   <div class="bar">
-    <input class="inp search" id="q" placeholder="Rechercher un nom, un secteur, un contact, une ville…">
-    <select class="inp" id="fType"><option value="">Tous les types</option></select>
-    <select class="inp" id="fStat"><option value="">Tous les statuts</option></select>
+    <input class="inp search" id="q" type="search" aria-label="Rechercher dans les fiches" placeholder="Rechercher un nom, un secteur, un contact, une ville…">
+    <select class="inp" id="fType" aria-label="Filtrer par type"><option value="">Tous les types</option></select>
+    <select class="inp" id="fStat" aria-label="Filtrer par statut"><option value="">Tous les statuts</option></select>
     <button class="btn primary" id="add">+ Nouvelle fiche</button>
   </div>
 
   <div class="panel">
-    <table>
+    <table aria-label="Toutes les fiches de prospection">
       <thead><tr>
         <th>Structure / secteur</th><th>Type</th><th>Contact</th><th>Ville</th>
         <th>Visite</th><th>Canal</th><th>Statut</th><th>Relance</th><th></th>
@@ -354,6 +369,7 @@ button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;curso
       <tbody id="rows"></tbody>
     </table>
   </div>
+  <div style="text-align:center;margin-top:12px"><button type="button" class="btn" id="moreRows" style="display:none">Afficher plus</button></div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -386,7 +402,7 @@ button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;curso
     <button type="submit" class="btn primary">Enregistrer</button>
   </div>
 </form>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 "use strict";
@@ -407,14 +423,25 @@ function showResultTab(tab){
   $("#tabMand").classList.toggle("active",activeResultTab==="mandataire");
 }
 function lab(list,v){for(var i=0;i<list.length;i++)if(list[i][0]===v)return list[i][1];return v||"—";}
-function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function str(v){return v==null?"":String(v);}
 function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-function fd(s){if(!s)return "—";var p=String(s).split("-");return p[2]+"/"+p[1]+"/"+p[0].slice(2);}
+/* JJ/MM/AA ; une date ancienne mal formée est affichée telle quelle (au lieu de « undefined/undefined »). */
+function fd(s){if(!s)return "—";var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));return m?(m[3]+"/"+m[2]+"/"+m[1].slice(2)):String(s);}
+function isoOk(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s);}
+/* Relance en retard : date dépassée (ou du jour) sur une fiche encore ouverte. */
+var STATUTS_CLOS={client:1,sans_suite:1};
+function relanceDue(f,today){return isoOk(f.relance)&&f.relance<=today&&!STATUTS_CLOS[f.statut];}
 function uid(){return "p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 var STATUT_OK={};STATUTS.forEach(function(s){STATUT_OK[s[0]]=1;});
 function statutValide(s){return STATUT_OK[s]?s:"a_contacter";}
 /* Données stockées : toujours un tableau de fiches (objets), sinon []. */
-function asFiches(v){return Array.isArray(v)?v.filter(function(f){return f&&typeof f==="object";}):[];}
+function asFiches(v){
+  var a=Array.isArray(v)?v.filter(function(f){return f&&typeof f==="object"&&!Array.isArray(f);}):[];
+  /* Anciennes fiches sans identifiant : impossible à ouvrir / modifier → id attribué. */
+  a.forEach(function(f){if(f.id==null||f.id==="")f.id=uid();else if(typeof f.id!=="string")f.id=String(f.id);});
+  return a;
+}
 
 var fiches=[];
 try{var raw=localStorage.getItem(KEY);if(raw)fiches=asFiches(JSON.parse(raw));}catch(e){fiches=[];}
@@ -437,7 +464,8 @@ fill($("#fStat"),STATUTS,"Tous les statuts");$("#fStat").insertAdjacentHTML("bef
 function matchStat(f,fs){return !fs||(fs==="__contactes"?f.statut!=="a_contacter":f.statut===fs);}
 fill($("#f_type"),TYPES);fill($("#f_canal"),CANAUX);fill($("#f_statut"),STATUTS);
 
-function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(function(){t.classList.remove("show");},2200);}
+var toastT=null;
+function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("show");},Math.max(2200,Math.min(6000,String(m).length*55)));}
 
 function render(){
   var today=iso(new Date());
@@ -459,14 +487,25 @@ function render(){
     if(!matchStat(f,fs))return false;
     if(!q)return true;
     return [f.nom,f.contact,f.ville,f.adresse,f.notes].join(" ").toLowerCase().indexOf(q)>-1;
-  }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
+  }).sort(function(a,b){
+    /* Relances dues en tête (les plus anciennes d'abord), puis visites les plus récentes. */
+    var ra=relanceDue(a,today),rb=relanceDue(b,today);
+    if(ra!==rb)return ra?-1:1;
+    if(ra&&rb)return str(a.relance).localeCompare(str(b.relance));
+    return str(b.date).localeCompare(str(a.date));
+  });
 
   if(!list.length){
     $("#rows").innerHTML='<tr><td colspan="9" class="empty">'+(fiches.length?"Aucune fiche ne correspond aux filtres.":"Aucune fiche pour le moment. Commence par « Nouvelle fiche ».")+"</td></tr>";
+    $("#moreRows").style.display="none";
     return;
   }
+  /* Liste longue : affichage par tranches (évite des milliers de lignes d'un coup). */
+  var total=list.length;list=list.slice(0,rowsLimit);
+  var mr=$("#moreRows");
+  if(total>list.length){mr.style.display="";mr.textContent="Afficher plus ("+list.length+" sur "+total+")";}else mr.style.display="none";
   $("#rows").innerHTML=list.map(function(f){
-    var rel=f.relance?('<span class="'+(f.relance<=today?"late":"")+'">'+esc(fd(f.relance))+"</span>"):"—";
+    var rel=f.relance?('<span class="'+(relanceDue(f,today)?"late":"")+'"'+(relanceDue(f,today)?' title="Relance à faire"':"")+'>'+esc(fd(f.relance))+"</span>"):"—";
     return '<tr>'+
       '<td data-l="Structure"><span class="nm">'+esc(f.nom||"—")+"</span>"+(f.adresse?'<div class="sm2">'+esc(f.adresse)+"</div>":"")+"</td>"+
       '<td data-l="Type">'+esc(lab(TYPES,f.type))+"</td>"+
@@ -476,7 +515,7 @@ function render(){
       '<td data-l="Canal">'+esc(lab(CANAUX,f.canal))+"</td>"+
       '<td data-l="Statut">'+statutTag(f)+"</td>"+
       '<td data-l="Relance">'+rel+"</td>"+
-      '<td><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+      '<td data-l=""><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
       "</tr>";
   }).join("");
 }
@@ -595,7 +634,7 @@ function stampTrajet(ville,dep,g){
   if(!g||g.min==null)return false;
   var t={min:g.min,km:g.km,approx:!!g.approx,le:iso(new Date())},ch=false;
   fiches.forEach(function(f){
-    if((f.ville||"")!==ville)return;
+    if(norm(f.ville)!==norm(ville))return;
     if(dep){var d=depFromCp(cpOf(f));if(d&&d!==dep)return;}
     if(f.trajet&&f.trajet.min!=null&&!f.trajet.approx)return;
     if(f.trajet&&f.trajet.min!=null&&f.trajet.approx&&g.approx)return;
@@ -615,6 +654,7 @@ function queueStamp(ville,dep,g){
     q.forEach(function(a){try{stampTrajet(a[0],a[1],a[2]);}catch(e){}});
   },0);
 }
+var TRAJET_OFF='<span class="trajet wait" title="Temps de route non calculé : service de cartographie injoignable (réessai automatique au retour du réseau)">trajet indisponible</span>';
 var TRAJET_NONE='<span class="trajet wait" title="Commune introuvable : temps de route non disponible">—</span>';
 function trajetChip(ville,dep,vlist){
   if(norm(ville)===norm(ORIGINE.nom))return '<span class="trajet" title="Ville de départ"><svg class="pi" viewBox="0 0 24 24"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>Sur place</span>';
@@ -628,6 +668,8 @@ function trajetChip(ville,dep,vlist){
     if(!t&&g&&g.none)return TRAJET_NONE;
     g=t||g;
     needGeo(ville,dep);
+    /* Réseau indisponible : plus de « calcul… » sans fin. */
+    if((!g||g.min==null)&&geoFailed[geoKey(ville,dep)])return TRAJET_OFF;
     if(!g||g.min==null)return '<span class="trajet wait" title="Calcul du temps de route depuis Mérignac…"><svg class="pi" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>calcul…</span>';
   }
   return '<span class="trajet" title="Temps de route estimé depuis Mérignac'+(g.km!=null?(" · "+g.km+" km"):"")+(g.approx?" (estimation provisoire, sera recalculée)":"")+'"><svg class="pi" viewBox="0 0 24 24"><path d="M5 17h14M6 17l1.5-5.5A2 2 0 0 1 9.4 10h5.2a2 2 0 0 1 1.9 1.5L18 17"/><circle cx="8" cy="17.5" r="1.6"/><circle cx="16" cy="17.5" r="1.6"/></svg>'+esc(fmtTrajet(g))+(fmtTrajet(g)!=="Sur place"?' <span class="tj-from">depuis Mérignac</span>':"")+"</span>";
@@ -640,7 +682,15 @@ function calibre(m){
   return Math.round(m*f);
 }
 function hav(a,b,c,d){var R=6371,r=Math.PI/180,x=Math.sin((c-a)*r/2),y=Math.sin((d-b)*r/2);var h=x*x+Math.cos(a*r)*Math.cos(c*r)*y*y;return 2*R*Math.asin(Math.sqrt(h));}
-var geoQueue=[],geoBusy=false,geoTried={},geoRenderT=null;
+var geoQueue=[],geoBusy=false,geoTried={},geoFailed={},geoRenderT=null;
+/* fetch avec délai maximal : un service muet ne bloque plus la file des calculs. */
+function fetchT(url,ms){
+  var ctl=null;try{ctl=new AbortController();}catch(e){}
+  var t=setTimeout(function(){try{if(ctl)ctl.abort();}catch(e){}},ms||10000);
+  return fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(t);return r;},function(e){clearTimeout(t);throw e;});
+}
+/* Retour du réseau : les villes en échec sont recalculées. */
+window.addEventListener("online",function(){Object.keys(geoFailed).forEach(function(k){delete geoTried[k];});geoFailed={};geoRerender();});
 function needGeo(ville,dep){
   if(!ville||ville==="Ville inconnue")return;
   var k=geoKey(ville,dep);
@@ -654,9 +704,12 @@ async function runGeo(){
   if(geoBusy)return;geoBusy=true;
   try{
     while(geoQueue.length){
-      if(typeof navigator!=="undefined"&&navigator.onLine===false){geoQueue.length=0;break;}
+      if(typeof navigator!=="undefined"&&navigator.onLine===false){geoQueue.forEach(function(x){geoFailed[x.k]=1;});geoQueue.length=0;geoRerender();break;}
       var it=geoQueue.shift();
-      try{if(await geoResolve(it))geoRerender();}catch(e){}
+      var ok=false;
+      try{ok=await geoResolve(it);}catch(e){ok=false;}
+      if(ok)geoRerender();
+      else{geoFailed[it.k]=1;geoRerender();}
     }
   }finally{geoBusy=false;}
 }
@@ -665,8 +718,8 @@ async function geoResolve(it){
   if(g.none)return false;
   if(g.lat==null){
     var url="https://geo.api.gouv.fr/communes?nom="+encodeURIComponent(it.ville)+(it.dep?"&codeDepartement="+encodeURIComponent(it.dep):"")+"&fields=nom,centre,mairie,codeRegion,codeDepartement,population&boost=population&limit=5";
-    var r=await fetch(url);if(!r.ok)return false;
-    var a=await r.json();if(!a||!a.length){g.none=1;geo[it.k]=g;saveGeo();return true;}
+    var r=await fetchT(url,10000);if(!r.ok)return false;
+    var a=await r.json();if(!Array.isArray(a)||!a.length){g.none=1;geo[it.k]=g;saveGeo();return true;}
     var n=norm(it.ville),c=null;
     for(var i=0;i<a.length;i++)if(norm(a[i].nom)===n){c=a[i];break;}
     c=c||a[0];
@@ -676,7 +729,7 @@ async function geoResolve(it){
   if(g.min==null||g.approx){
     try{
       var u="https://router.project-osrm.org/route/v1/driving/"+ORIGINE.lon+","+ORIGINE.lat+";"+g.lon+","+g.lat+"?overview=false";
-      var r2=await fetch(u);var j=await r2.json();
+      var r2=await fetchT(u,10000);var j=await r2.json();
       if(j&&j.code==="Ok"&&j.routes&&j.routes[0]){g.min=calibre(j.routes[0].duration/60);g.km=Math.round(j.routes[0].distance/1000);g.approx=false;}
       else throw new Error("osrm");
     }catch(e){
@@ -716,9 +769,11 @@ function cityGroupsHTML(type,singular,plural,emptyIdleHint){
   var caretO="<svg class='pi' viewBox='0 0 24 24'><path d='m6 9 6 6 6-6'/></svg>",caretC="<svg class='pi' viewBox='0 0 24 24'><path d='m9 6 6 6-6 6'/></svg>";
   var byReg={};
   list.forEach(function(f){
-    var r=groupeOf(f),v=f.ville||"Ville inconnue";
-    var R=byReg[r]=byReg[r]||{n:0,villes:{}};R.n++;
-    (R.villes[v]=R.villes[v]||[]).push(f);
+    var r=groupeOf(f),v=str(f.ville).trim()||"Ville inconnue",vk=norm(v)||"ville inconnue";
+    /* Regroupement insensible à la casse / aux accents (« bordeaux » = « Bordeaux »). */
+    var R=byReg[r]=byReg[r]||{n:0,villes:{},noms:{}};R.n++;
+    (R.villes[vk]=R.villes[vk]||[]).push(f);
+    if(!R.noms[vk]||(R.noms[vk]===R.noms[vk].toLowerCase()&&v!==v.toLowerCase()))R.noms[vk]=v;
   });
   var regs=Object.keys(byReg).sort(function(a,b){
     if(a===SANS_DEP)return 1;if(b===SANS_DEP)return -1;
@@ -727,19 +782,20 @@ function cityGroupsHTML(type,singular,plural,emptyIdleHint){
   return regs.map(function(rg){
     var R=byReg[rg],ropen=!closedRegions.has(rg);
     var villes=Object.keys(R.villes).sort(function(a,b){return R.villes[b].length-R.villes[a].length||a.localeCompare(b);});
-    var inner=villes.map(function(v){
-      var vlist=R.villes[v].sort(function(a,b){return (a.nom||"").localeCompare(b.nom||"");});
+    var inner=villes.map(function(vk){
+      var v=R.noms[vk];
+      var vlist=R.villes[vk].sort(function(a,b){return str(a.nom).localeCompare(str(b.nom));});
       var ck=cityKeyOf(vlist[0]),open=openCities.has(ck),dep="";
       for(var i=0;i<vlist.length&&!dep;i++)dep=depFromCp(cpOf(vlist[i]));
       var rows=vlist.map(function(f){
-        var tel=(f.tel||"").trim();
+        var tel=str(f.tel).trim();
         return '<tr>'+
           '<td data-l="'+(showReseau?"Mandataire":"Agence")+'"><span class="nm">'+esc(f.nom||"—")+"</span></td>"+
           (showReseau?('<td data-l="Réseau">'+(f.reseau?('<span class="tag">'+esc(f.reseau)+"</span>"):"—")+"</td>"):"")+
           '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
           '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
           '<td data-l="Statut">'+statutTag(f)+"</td>"+
-          '<td><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+          '<td data-l=""><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
           "</tr>";
       }).join("");
       return '<div class="city-group">'+
@@ -874,7 +930,14 @@ function msgErreur(e){
   if(st===401||st===403)return "session expirée ou accès refusé — reconnecte-toi depuis le tableau de bord du CRM";
   if(st===429)return "quota de recherche atteint — réessaie plus tard";
   if(e&&e.timeout)return "le service n'a pas répondu en 20 s";
-  return (e&&e.message)||"service indisponible";
+  /* Erreurs réseau brutes (anglais, techniques) → message clair. */
+  var m=String((e&&e.message)||"");
+  if(e&&e.reseau)return m;
+  if((e&&(e.name==="TypeError"||e.name==="FunctionsFetchError"||e.name==="AbortError"))||/failed to fetch|failed to send|networkerror|load failed|network request failed|aborted/i.test(m))
+    return "réseau indisponible ou service de recherche injoignable — vérifie la connexion puis réessaie";
+  if(e&&e.name==="FunctionsRelayError")return "service de recherche momentanément indisponible";
+  if(e&&e.name==="FunctionsHttpError")return "le service de recherche a renvoyé une erreur"+(errStatus(e)?" ("+errStatus(e)+")":"");
+  return m||"service indisponible";
 }
 /* Appel de la fonction de recherche avec délai maximal (20 s). */
 function invokeRecherche(client,body){
@@ -1008,7 +1071,9 @@ function searchCity(villeRaw){
 async function villesDeZone(z,n){
   /* 1) Liste légère (nom, population, département) pour choisir les N plus peuplées… */
   var url="https://geo.api.gouv.fr/communes?"+(z.kind==="region"?"codeRegion=":"codeDepartement=")+encodeURIComponent(z.code)+"&fields=nom,code,population,codeDepartement&format=json";
-  var r=await fetch(url);if(!r.ok)throw new Error("liste des villes indisponible");
+  var r;
+  try{r=await fetchT(url,15000);}catch(e){var ne=new Error("liste des villes injoignable (réseau indisponible ?)");ne.reseau=true;throw ne;}
+  if(!r.ok)throw new Error("liste des villes indisponible");
   var a=await r.json();
   a=(Array.isArray(a)?a:[]).filter(function(c){return c&&c.nom;}).sort(function(x,y){return (y.population||0)-(x.population||0);}).slice(0,n);
   /* 2) …puis coordonnées (mairie / centre) uniquement pour les villes retenues. */
@@ -1016,7 +1081,7 @@ async function villesDeZone(z,n){
     if(!c.code)return null;
     var k1=geoKey(c.nom,c.codeDepartement||"");
     if(geo[k1]&&geo[k1].lat!=null)return null;
-    return fetch("https://geo.api.gouv.fr/communes/"+encodeURIComponent(c.code)+"?fields=nom,centre,mairie,codeRegion,codeDepartement&format=json")
+    return fetchT("https://geo.api.gouv.fr/communes/"+encodeURIComponent(c.code)+"?fields=nom,centre,mairie,codeRegion,codeDepartement&format=json")
       .then(function(r2){return r2.ok?r2.json():null;})
       .then(function(d){
         if(!d)return;
@@ -1093,7 +1158,7 @@ var editing=null;
 function openSheet(f){
   editing=f?f.id:null;
   $("#sTitle").textContent=f?"Modifier la fiche":"Nouvelle fiche";
-  $("#f_type").value=f?f.type:"agence";
+  $("#f_type").value=f?(f.type||"agence"):"agence";
   $("#f_nom").value=f?(f.nom||""):"";
   $("#f_contact").value=f?(f.contact||""):"";
   $("#f_adresse").value=f?(f.adresse||""):"";
@@ -1127,15 +1192,19 @@ $("#addTop").addEventListener("click",function(){openSheet(null);});
 $("#close").addEventListener("click",closeSheet);
 $("#cancel").addEventListener("click",closeSheet);
 $("#scrim").addEventListener("click",closeSheet);
-$("#q").addEventListener("input",render);
-$("#fType").addEventListener("change",render);
-$("#fStat").addEventListener("change",render);
-$("#kTotBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
-$("#kTodoBtn").addEventListener("click",function(){$("#fStat").value="__contactes";$("#fType").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
-$("#kIntBtn").addEventListener("click",function(){$("#fStat").value="a_rappeler";$("#fType").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
-$("#kCliBtn").addEventListener("click",function(){$("#fStat").value="client";$("#fType").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
-$("#kRelBtn").addEventListener("click",function(){$("#fStat").value="sans_suite";$("#fType").value="";$("#q").value="";render();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
-$("#kVillesBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";render();document.getElementById("resultTabs").scrollIntoView({behavior:"smooth",block:"start"});});
+/* Recherche : rendu différé pendant la frappe (listes longues). */
+var ROWS_STEP=200,rowsLimit=ROWS_STEP,qT=null;
+function renderFiltre(){rowsLimit=ROWS_STEP;render();}
+$("#q").addEventListener("input",function(){clearTimeout(qT);qT=setTimeout(renderFiltre,150);});
+$("#fType").addEventListener("change",renderFiltre);
+$("#fStat").addEventListener("change",renderFiltre);
+$("#moreRows").addEventListener("click",function(){rowsLimit+=ROWS_STEP;render();});
+$("#kTotBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kTodoBtn").addEventListener("click",function(){$("#fStat").value="__contactes";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kIntBtn").addEventListener("click",function(){$("#fStat").value="a_rappeler";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kCliBtn").addEventListener("click",function(){$("#fStat").value="client";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kRelBtn").addEventListener("click",function(){$("#fStat").value="sans_suite";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kVillesBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("resultTabs").scrollIntoView({behavior:"smooth",block:"start"});});
 
 $("#sheet").addEventListener("submit",function(e){
   e.preventDefault();
@@ -1144,8 +1213,17 @@ $("#sheet").addEventListener("submit",function(e){
     adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),tel:$("#f_tel").value.trim(),canal:$("#f_canal").value,
     date:$("#f_date").value,relance:$("#f_relance").value,statut:statutValide($("#f_statut").value),notes:$("#f_notes").value.trim()
   };
-  if(!o.nom){$("#f_nom").focus();return;}
+  if(!o.nom){$("#f_nom").focus();toast("Indique au moins le nom de la structure ou du secteur");return;}
+  if(o.date&&!isoOk(o.date))o.date="";if(o.relance&&!isoOk(o.relance))o.relance="";
   var prevF=null;if(editing){for(var pi=0;pi<fiches.length;pi++)if(fiches[pi].id===editing)prevF=fiches[pi];}
+  /* Type / canal d'une ancienne fiche hors liste : conservés (le menu affichait vide et les effaçait). */
+  if(!o.type&&prevF)o.type=prevF.type;if(!o.canal&&prevF)o.canal=prevF.canal;
+  /* Doublon : même nom dans la même ville (ou même téléphone) déjà en fiche. */
+  if(!editing){
+    var dup=null,nn=norm(o.nom),nv=norm(o.ville),t9=tel9(o.tel);
+    for(var di2=0;di2<fiches.length&&!dup;di2++){var x=fiches[di2];if((nn&&norm(x.nom)===nn&&norm(x.ville)===nv)||(t9&&tel9(x.tel)===t9))dup=x;}
+    if(dup&&!window.confirm("Une fiche semblable existe déjà : « "+(dup.nom||"sans nom")+" »"+(dup.ville?" ("+dup.ville+")":"")+".\n\nCréer quand même une nouvelle fiche ?"))return;
+  }
   if(o.statut==="client"&&!(prevF&&prevF.statut==="client"))o.autoClient=false;
   if(editing){
     o.id=editing;
@@ -1167,7 +1245,13 @@ $("#sheet").addEventListener("submit",function(e){
   }
   if(!persist()){render();return;}
   render();closeSheet();
-  if(o.relance&&o.statut!=="client"&&o.statut!=="sans_suite")sendToAgenda(o);else toast("Fiche enregistrée");
+  /* Envoi au calendrier seulement si la relance est nouvelle ou a changé (ou si la fiche
+     est rouverte) : sinon chaque modification (une note…) remettait la relance à 9 h
+     et la repassait « planifiée » dans l'agenda, même déjà traitée. */
+  var ouverte=o.relance&&!STATUTS_CLOS[o.statut];
+  var aEnvoyer=ouverte&&(!prevF||prevF.relance!==o.relance||!!STATUTS_CLOS[prevF.statut]);
+  if(aEnvoyer){if(!sendToAgenda(o))toast("Fiche enregistrée — calendrier indisponible (ouvre la prospection depuis le CRM)");}
+  else toast("Fiche enregistrée");
 });
 
 $("#del").addEventListener("click",function(){
