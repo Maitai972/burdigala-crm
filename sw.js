@@ -1,51 +1,1284 @@
-const CACHE = "burdigala-shell-v3";
-const ASSETS = ["./", "./index.html", "./prospection.html", "./supabase.js", "./manifest.json", "./icon-192.png", "./icon-512.png", "./icon-512-maskable.png"];
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-self.addEventListener("install", (event) => {
-  // Mise en cache fichier par fichier : un fichier absent (ex. une icône) ne
-  // doit plus faire échouer toute l'installation (addAll est "tout ou rien").
-  event.waitUntil(
-    caches.open(CACHE)
-      .then((c) => Promise.allSettled(ASSETS.map((a) =>
-        fetch(a, { cache: "reload" }).then((res) => { if (res.ok) return c.put(a, res); throw new Error(a + " " + res.status); })
-      )))
-      .then(() => self.skipWaiting())
-  );
-});
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prospection</title>
+<script src="supabase.js"></script>
+<script>/* Secours : CDN à version exacte + contrôle d'intégrité si la copie locale est absente. */if(!(window.supabase&&window.supabase.createClient))document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"><\/script>');</script>
+<style>
+:root{
+  --ink:#3A3F3B; --ink-2:#4C514D; --muted:#6E736F; --line:#E3E6E1;
+  --green:#6DB33F; --card:#fff;
+  --grad:linear-gradient(180deg,#343835 0%,#4C514D 18%,#6E736F 38%,#9DA29E 62%,#C4C8C4 82%,#D8DBD7 100%);
+}
+*{box-sizing:border-box;}
+html{margin:0;}
+body{margin:0;background:transparent;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;}
+.app-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--grad);}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:14px 18px;margin-bottom:18px;box-shadow:0 6px 24px rgba(26,31,28,.05);flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand .mark{width:46px;height:46px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;padding:2px;flex:0 0 auto;}
+.brand .mark img{width:100%;height:100%;object-fit:contain;}
+.brand h1{margin:0;font-size:26px;line-height:1.15;color:var(--ink);letter-spacing:-.01em;}
+.brand .sub{margin:2px 0 0;color:var(--muted);font-size:13px;}
+.topbar .actions{display:flex;gap:8px;flex-wrap:wrap;}
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
+h1{margin:0;font-size:26px;line-height:1.15;color:#fff;letter-spacing:-.01em;}
+.sub{margin:6px 0 0;color:rgba(255,255,255,.8);font-size:13.5px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:20px 0;}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:0 4px 18px rgba(26,31,28,.06);}
+.kpi-click{font-family:inherit;text-align:left;cursor:pointer;transition:border-color .14s,box-shadow .14s;}
+.kpi-click:hover{border-color:var(--green);box-shadow:0 6px 20px rgba(26,31,28,.1);}
+.kpi .n{font-size:24px;font-weight:700;color:var(--ink);}
+.kpi .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:2px;}
+.bar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:14px;}
+.inp,select{font-family:inherit;font-size:13.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;min-width:0;}
+.inp:focus,select:focus{outline:2px solid rgba(109,179,63,.35);outline-offset:0;border-color:var(--green);}
+.search{flex:1;min-width:180px;}
+.btn{font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .14s;}
+.btn:hover{border-color:var(--muted);}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff;}
+.btn.primary:hover{filter:brightness(1.06);}
+.btn.sm{padding:5px 9px;font-size:12px;}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(26,31,28,.06);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap;}
+td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink);}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#FAFBF9;}
+.nm{font-weight:700;}
+.sm2{font-size:12px;color:var(--muted);}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap;background:#EEF1EC;color:var(--ink-2);}
+.st-a_contacter{background:#EDEFF1;color:#4C514D;}
+.st-contacte{background:#E4ECF6;color:#2F5480;}
+.st-interesse{background:#FBF0DC;color:#7A5A16;}
+.st-client{background:#E6F2DC;color:#3D6B21;}
+.st-sans_suite{background:#F2E6E6;color:#7A3A3A;}
+.st-rdv{background:#EAE3F7;color:#5B3FA6;}
+.st-a_rappeler{background:#FBEEDC;color:#A6620E;}
+.late{color:#A0392F;font-weight:700;}
+.section-h{font-size:15px;font-weight:700;color:var(--ink);margin:24px 0 10px;}
+.search-panel{padding:16px 18px;margin-bottom:14px;}
+.search-bar{display:flex;gap:9px;flex-wrap:wrap;}
+.search-bar .search{flex:1;min-width:200px;}
+.search-status{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;font-weight:600;padding:9px 12px;border-radius:9px;}
+.search-status.loading{background:#EAF1F8;color:#2F5480;}
+.search-status.error{background:#F2E6E6;color:#7A3A3A;}
+.search-status.empty{background:#EEF1EC;color:var(--ink-2);}
+.search-status.ok{background:#E6F2DC;color:#3D6B21;}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(47,84,128,.25);border-top-color:#2F5480;animation:spin .7s linear infinite;flex:0 0 auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.result-tabs{display:flex;gap:6px;margin:22px 0 12px;border-bottom:1.5px solid var(--line);}
+.rtab{font-family:inherit;font-size:13.5px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2.5px solid transparent;padding:9px 4px 11px;margin-bottom:-1.5px;cursor:pointer;display:flex;align-items:center;gap:7px;}
+.rtab .cnt{background:#EEF1EC;color:var(--ink-2);border-radius:999px;font-size:11.5px;padding:1px 7px;}
+.rtab:hover{color:var(--ink);}
+.rtab.active{color:var(--ink);border-bottom-color:var(--green);}
+.rtab.active .cnt{background:var(--green);color:#fff;}
+.city-group{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(26,31,28,.06);overflow:hidden;margin-bottom:12px;}
+.city-h{width:100%;text-align:left;background:#FAFBF9;border:none;border-bottom:1px solid var(--line);padding:13px 16px;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit;}
+.city-h:hover{background:#F2F5EE;}
+.city-b table{width:100%;}
+.city-caret{font-size:10px;color:var(--muted);width:10px;display:inline-block;}
+.acts{display:flex;gap:6px;justify-content:flex-end;}
+.empty{padding:34px 20px;text-align:center;color:var(--muted);}
+.scrim{position:fixed;inset:0;background:rgba(22,26,23,.5);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40;}
+.scrim.show{opacity:1;pointer-events:auto;}
+.sheet{position:fixed;top:0;right:0;height:100%;width:430px;max-width:94vw;background:#fff;z-index:41;transform:translateX(102%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(20,24,21,.28);}
+.sheet.open{transform:none;}
+.sheet-h{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+.sheet-h h2{margin:0;font-size:17px;color:var(--ink);}
+.sheet-b{padding:16px 18px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:13px;}
+.sheet-f{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:9px;justify-content:flex-end;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.x{background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px;}
+textarea.inp{resize:vertical;min-height:72px;}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#2F332F;color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;opacity:0;transition:all .2s;z-index:60;}
+.toast.show{opacity:1;transform:translateX(-50%);}
+@media(max-width:760px){
+  thead{display:none;}
+  tr{display:block;border-bottom:1px solid var(--line);padding:10px 4px;}
+  tr:last-child{border-bottom:none;}
+  td{display:flex;justify-content:space-between;gap:12px;border:none;padding:4px 12px;}
+  td:before{content:attr(data-l);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;}
+  .acts{justify-content:flex-start;}
+}
+</style>
+<style id="pro-theme">
+/* ===== Thème pro unifié (visuel uniquement) ===== */
+:root{
+  --bg:#F6F7F9;
+  --forest:#101828; --forest-3:#4E8F2E; --forest-pale:#ECF5E6;
+  --green:#4E8F2E; --green-d:#3F7A23; --pale:#ECF5E6;
+  --vert:#4E8F2E; --vert-d:#3F7A23; --vert-pale:#ECF5E6; --anthracite:#101828;
+  --cream:#F9FAFB; --cream-2:#EEF0F3; --cream-3:#E4E7EC; --cream2:#EEF0F3; --cream3:#E4E7EC; --creme:#F9FAFB;
+  --line:#E4E7EC; --line-2:#EEF0F3;
+  --ink:#101828; --ink-2:#344054; --ink-3:#475467; --ink-4:#667085; --ink2:#344054; --ink3:#475467; --ink4:#667085; --muted:#667085;
+  --red:#D92D20; --danger:#D92D20; --amber:#B54708;
+  --grad:#F6F7F9;
+  --p-ctl:#D0D5DD; --p-sh:0 1px 2px rgba(16,24,40,.05); --p-ring:0 0 0 3px rgba(78,143,46,.18);
+  --p-font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+html{background:var(--bg)!important;}
+body{font-family:var(--p-font)!important;background:var(--bg)!important;color:var(--ink);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:"cv11","ss01";}
+.app-bg{display:none!important;}
+::-webkit-scrollbar{width:10px;height:10px;} ::-webkit-scrollbar-thumb{background:#D0D5DD;border-radius:6px;border:3px solid var(--bg);} ::-webkit-scrollbar-track{background:transparent;}
 
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-  let url;
-  try { url = new URL(req.url); } catch (e) { return; }
-  if (url.origin !== self.location.origin) return; // never intercept Supabase / CDN calls
+/* Conteneur */
+body > .container, body > .app, body > .wrap{max-width:1240px!important;padding:28px 32px 48px;}
+body > .app[style*="height"], body > .app.cal-app{padding-bottom:24px;}
 
-  event.respondWith(
-    fetch(req)
-      .then((res) => {
-        // On ne met en cache que les réponses valides (une 404/500 ne doit
-        // jamais remplacer une bonne copie hors ligne).
-        if (res.ok) {
-          const copy = res.clone();
-          event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
-        }
-        return res;
+/* En-tête de page */
+.topbar{background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;padding:0 0 4px!important;margin-bottom:20px!important;}
+.brand .mark{display:none!important;}
+.brand h1{font-size:22px!important;font-weight:600!important;letter-spacing:-.02em;color:var(--ink)!important;line-height:1.2!important;}
+.brand .sub{color:var(--muted)!important;font-size:14px!important;letter-spacing:0!important;text-transform:none!important;font-weight:400!important;margin-top:2px;}
+.pagehint{color:var(--muted);font-size:14px;margin:-12px 0 20px;}
+
+/* Cartes */
+.card{background:#fff;border:1px solid var(--line)!important;border-radius:12px!important;box-shadow:var(--p-sh)!important;padding:24px;}
+.card h2{font-size:16px!important;font-weight:600!important;letter-spacing:-.01em;color:var(--ink);gap:10px;margin-bottom:4px;}
+.card h2::before{display:none!important;}
+.card .hint{color:var(--muted);font-size:13px;}
+
+/* Boutons */
+.btn{border-radius:8px!important;font-weight:600;font-size:13.5px;padding:8px 14px;line-height:1.35;border:1px solid transparent;box-shadow:var(--p-sh);transition:background .15s,border-color .15s,color .15s,box-shadow .15s;}
+.btn:focus-visible{outline:none;box-shadow:var(--p-ring);}
+.btn-primary,.btn-green,.btn.primary{background:var(--green)!important;border-color:var(--green)!important;color:#fff!important;}
+.btn-primary:hover,.btn-green:hover,.btn.primary:hover{background:var(--green-d)!important;border-color:var(--green-d)!important;filter:none;}
+.btn-dark{background:#101828!important;border-color:#101828!important;color:#fff!important;}
+.btn-dark:hover{background:#1D2939!important;opacity:1;}
+.btn-ghost,.btn:not(.btn-primary):not(.btn-green):not(.btn-dark):not(.btn-danger):not(.primary){background:#fff;border-color:var(--p-ctl);color:var(--ink-2);}
+.btn-ghost:hover,.btn:not(.btn-primary):not(.btn-green):not(.btn-dark):not(.btn-danger):not(.primary):hover{background:#F9FAFB;border-color:var(--p-ctl);color:var(--ink);}
+.btn-danger{background:#fff!important;color:#B42318!important;border:1px solid #FECDCA!important;}
+.btn-danger:hover{background:#FEF3F2!important;}
+.btn-sm,.btn.sm{padding:5px 10px!important;font-size:12.5px!important;border-radius:7px!important;}
+.btn svg.pi{width:15px;height:15px;flex:0 0 auto;}
+.pi{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;flex:0 0 auto;}
+
+/* Champs */
+.field label{font-size:13px!important;font-weight:500!important;color:var(--ink-2)!important;text-transform:none!important;letter-spacing:0!important;}
+.field input,.field select,.field textarea,textarea,.inp,.side-search,.monthbar select{border:1px solid var(--p-ctl)!important;border-radius:8px!important;background:#fff!important;color:var(--ink);box-shadow:var(--p-sh);font-family:inherit;}
+.field input[type=checkbox],.field input[type=radio]{box-shadow:none;}
+.field input:focus,.field select:focus,.field textarea:focus,textarea:focus,.inp:focus,.side-search:focus,.monthbar select:focus{outline:none!important;border-color:var(--green)!important;box-shadow:var(--p-ring)!important;}
+.field.check{background:#fff!important;border:1px solid var(--line)!important;border-radius:8px!important;}
+.field.check label{font-size:13.5px!important;color:var(--ink-2)!important;}
+input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--green);}
+
+/* Badges & pastilles */
+.badge{font-size:12px!important;font-weight:500!important;letter-spacing:0!important;text-transform:none!important;border-radius:999px;padding:2px 9px!important;border:1px solid transparent;}
+.badge.pack,.badge.accepted{background:#ECFDF3!important;color:#067647!important;border-color:#ABEFC6;}
+.badge.pending{background:#FFFAEB!important;color:#B54708!important;border-color:#FEDF89;}
+.badge.paid{background:#ECF5E6!important;color:#3F7A23!important;border-color:#C9E3B5;}
+.badge.refused{background:#FEF3F2!important;color:#B42318!important;border-color:#FECDCA;}
+.badge.invoiced{background:#F4F3FF!important;color:#5925DC!important;border-color:#D9D6FE;}
+.pill.paye{background:#ECFDF3;color:#067647;}
+.pill.attente{background:#FFFAEB;color:#B54708;}
+.pill.retard{background:#FEF3F2;color:#B42318;}
+
+/* Tableaux de données */
+.tbl{font-size:13.5px;}
+.tbl th{background:#F9FAFB!important;color:var(--muted)!important;font-weight:500!important;font-size:12px!important;border-bottom:1px solid var(--line);padding:11px 12px!important;border-radius:0!important;}
+.tbl td{padding:12px!important;border-bottom:1px solid var(--line-2);color:var(--ink-2);}
+.tbl tr:hover td{background:#F9FAFB;}
+.tbl .empty{font-style:normal;color:var(--muted);}
+
+/* Bandeaux / notes */
+.banner,.parsed-note{background:#F6FEF9!important;border:1px solid #ABEFC6!important;color:#067647!important;border-radius:8px!important;}
+.warn,.warn-note{background:#FFFAEB!important;border:1px solid #FEDF89!important;color:#B54708!important;border-radius:8px!important;}
+
+/* Modales */
+.modal{border-radius:12px!important;box-shadow:0 20px 48px rgba(16,24,40,.18)!important;}
+.modal h3{font-size:18px!important;font-weight:600!important;letter-spacing:-.01em;}
+.modal-bg,.overlay{background:rgba(16,24,40,.5)!important;}
+.pdf-toolbar,#pdfOverlay .pdf-toolbar{background:#fff!important;border-bottom:1px solid var(--line)!important;}
+
+/* Toast */
+.toast{border-radius:8px!important;font-weight:500!important;background:#101828;}
+
+@media(max-width:820px){
+  body > .container, body > .app, body > .wrap{padding:16px 14px 32px;}
+  .brand h1{font-size:18px!important;}
+}
+
+/* ===== Motion design léger (le fondu d'ouverture est géré par le centre) ===== */
+@keyframes pFade{from{opacity:0;}to{opacity:1;}}
+@keyframes pPop{from{opacity:0;transform:translate3d(0,6px,0) scale(.985);}to{opacity:1;transform:none;}}
+.modal-bg.open,.overlay.open{animation:pFade .16s ease-out backwards;}
+.modal-bg.open .modal,.overlay.open .modal{animation:pPop .2s cubic-bezier(.2,.8,.2,1) backwards;}
+.menu.open{animation:pPop .14s cubic-bezier(.2,.8,.2,1) backwards;transform-origin:top right;}
+.btn,.tab,.chipf,.iconbtn,.viewswitch button,.diag-toggle,.rtab{transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease,transform .1s ease;}
+.btn:active,.chipf:active,.iconbtn:active{transform:scale(.98);}
+.tbl td,.devis-row{transition:background-color .12s ease;}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important;} }
+
+/* Prospection */
+h1{color:var(--ink)!important;}
+.sub{color:var(--muted)!important;}
+.brand h1{font-size:22px!important;}
+.kpis{gap:16px!important;margin:4px 0 24px!important;}
+.kpi{border:1px solid var(--line)!important;border-radius:12px!important;box-shadow:var(--p-sh)!important;padding:16px 18px!important;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:8px;}
+.kpi .n{font-size:24px!important;font-weight:600!important;letter-spacing:-.02em;color:var(--ink)!important;line-height:1.1;}
+.kpi .l{font-size:13px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;color:var(--muted)!important;margin:0!important;}
+.kpi-click:hover{border-color:#D0D5DD!important;box-shadow:0 4px 12px rgba(16,24,40,.08)!important;}
+.panel,.city-group{border:1px solid var(--line)!important;border-radius:12px!important;box-shadow:var(--p-sh)!important;}
+.panel th,.city-group th{background:#F9FAFB;font-size:12px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;color:var(--muted)!important;}
+.panel td,.city-group td{color:var(--ink-2);border-bottom-color:var(--line-2)!important;}
+.panel tbody tr:hover,.city-group tbody tr:hover{background:#F9FAFB!important;}
+.nm{font-weight:600!important;color:var(--ink);}
+.tag{font-weight:500!important;font-size:12px!important;}
+.section-h{font-size:16px!important;font-weight:600!important;letter-spacing:-.01em;margin:32px 0 12px!important;}
+.result-tabs{border-bottom:1px solid var(--line)!important;gap:24px!important;}
+.rtab{font-weight:500!important;font-size:14px!important;color:var(--muted)!important;border-bottom-width:2px!important;margin-bottom:-1px!important;}
+.rtab:hover{color:var(--ink)!important;}
+.rtab.active{color:var(--ink)!important;font-weight:600!important;}
+.rtab .cnt{background:#F2F4F7!important;font-weight:500;}
+.rtab.active .cnt{background:#ECF5E6!important;color:#3F7A23!important;}
+.city-h{background:#F9FAFB!important;font-weight:600!important;}
+.city-h:hover{background:#F2F4F7!important;}
+.city-caret{display:inline-flex;align-items:center;justify-content:center;width:14px!important;}
+.search-status{border-radius:8px!important;font-weight:500!important;}
+.sheet{box-shadow:-12px 0 40px rgba(16,24,40,.18)!important;}
+.sheet-h h2{font-size:16px!important;font-weight:600!important;}
+.scrim{background:rgba(16,24,40,.5)!important;}
+.empty{color:var(--muted)!important;}
+@media(max-width:760px){ td:before{text-transform:none!important;letter-spacing:0!important;font-weight:500!important;font-size:12px!important;} }
+.sheet:not(.open){box-shadow:none!important;}
+
+.st-contacte{background:#fff!important;color:#3F7A23!important;box-shadow:inset 0 0 0 1px #6DB33F;}
+.search-status.loading{background:#F4F9F0!important;color:#3F7A23!important;}
+.spin{border-color:rgba(109,179,63,.25)!important;border-top-color:#4E8F2E!important;}
+/* Statuts cliquables : à contacter / contactée */
+.tag-btn{font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px;line-height:1.5;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .1s ease;}
+.tag-btn:active{transform:scale(.96);}
+.st-a_contacter{background:#fff!important;color:#475467!important;border:1px dashed #98A2B3!important;box-shadow:none!important;}
+.tag-btn.st-a_contacter:hover{border-style:solid!important;border-color:#6DB33F!important;color:#3F7A23!important;background:#F4F9F0!important;}
+.st-contacte{background:#ECF5E6!important;color:#3F7A23!important;border:1px solid #C9E3B5!important;box-shadow:none!important;}
+.tag-btn.st-contacte:hover{background:#DFEFD3!important;}
+.st-client{background:#4E8F2E!important;color:#fff!important;border:1px solid #4E8F2E!important;}
+a.btn{text-decoration:none!important;}
+
+
+/* Régions + temps de route */
+.zone-nb{flex:0 0 auto;width:auto;min-width:110px;}
+.zone-hint{font-size:12px;color:var(--muted);margin-top:9px;}
+.btn.stop{background:#fff!important;color:#A0392F!important;border-color:#E4C3C0!important;}
+.region-group{margin-bottom:18px;}
+.region-h{width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;padding:6px 2px 10px;font-family:inherit;cursor:pointer;text-align:left;border-bottom:2px solid var(--green);margin-bottom:12px;}
+.region-h .region-t{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.01em;}
+.region-h .region-m{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted);background:#F2F4F7;border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.region-h:hover .region-t{color:#3F7A23;}
+.region-b{padding-left:0;}
+.region-del{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;color:var(--muted);opacity:0;transition:opacity .2s ease,background .2s ease,color .2s ease;flex:0 0 auto;}
+.region-del .pi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.region-h:hover .region-del,.region-del:focus-visible{opacity:.55;}
+.region-h .region-del:hover{opacity:1;color:#A0392F;background:#F7ECEB;}
+/* En-tête département : titre repliable + bouton de suppression séparé (accessible clavier) */
+.region-hw{display:flex;align-items:center;gap:6px;border-bottom:2px solid var(--green);margin-bottom:12px;}
+.region-hw .region-h{flex:1;min-width:0;border-bottom:none;margin-bottom:0;}
+button.region-del{background:none;border:none;padding:0;margin:0 2px 4px 0;cursor:pointer;font-family:inherit;}
+.region-hw:hover .region-del{opacity:.55;}
+.region-hw .region-del:hover{opacity:1;color:#A0392F;background:#F7ECEB;}
+.region-del:focus-visible{opacity:1;outline:none;box-shadow:var(--p-ring);color:#A0392F;}
+@media (hover:none){.region-del{opacity:.35;}}
+.city-h{flex-wrap:wrap;}
+.city-h .city-t{flex:0 1 auto;}
+.trajet{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:12px;font-weight:600;color:#3F7A23;background:#EEF6E8;border:1px solid #D4E8C4;border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.trajet .pi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.trajet .tj-from{font-weight:500;color:#5C7F45;}
+.trajet.wait{color:var(--muted);background:#F2F4F7;border-color:var(--line);font-weight:500;}
+/* Listes : actions sur plusieurs lignes plutôt que débordement ; textes longs coupés */
+.acts{flex-wrap:wrap;}
+td{overflow-wrap:anywhere;}
+.city-h .city-t{min-width:0;overflow-wrap:anywhere;}
+.region-h .region-t{min-width:0;overflow-wrap:anywhere;}
+.toast{width:max-content;max-width:calc(100vw - 32px);text-align:center;}
+.city-h:focus-visible,.region-h:focus-visible,.rtab:focus-visible,.kpi-click:focus-visible,.tag-btn:focus-visible,.x:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+@media(max-width:760px){
+  td{align-items:flex-start;}
+  td > *:not(.acts){text-align:right;}
+  td[data-l=""]:before{display:none;}
+  td:before{flex:0 0 auto;white-space:nowrap;overflow-wrap:normal;}
+  .rtab{white-space:normal;text-align:left;}
+  .sheet .row2{grid-template-columns:1fr;}
+}
+@media (max-width:640px){.trajet{margin-left:24px;}.trajet .tj-from{display:none;}.region-h .region-m{margin-left:0;}.region-h{flex-wrap:wrap;}}
+</style>
+</head>
+<body>
+<div class="app-bg" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"><img src="data:image/png;base64,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" alt=""></div>
+      <div>
+        <h1>Prospection</h1>
+        <p class="sub">Agences, bailleurs, secteurs en porte-à-porte et contacts pros.</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="addTop">+ Nouvelle fiche</button>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <button type="button" class="kpi kpi-click" id="kTotBtn"><div class="n" id="kTot">0</div><div class="l">Fiches</div></button>
+    <button type="button" class="kpi kpi-click" id="kTodoBtn"><div class="n" id="kTodo">0</div><div class="l">Contactés</div></button>
+    <button type="button" class="kpi kpi-click" id="kIntBtn"><div class="n" id="kInt">0</div><div class="l">À rappeler</div></button>
+    <button type="button" class="kpi kpi-click" id="kCliBtn"><div class="n" id="kCli">0</div><div class="l">Devenus clients</div></button>
+    <button type="button" class="kpi kpi-click" id="kRelBtn"><div class="n" id="kRel">0</div><div class="l">Pas intéressé</div></button>
+    <button type="button" class="kpi kpi-click" id="kVillesBtn"><div class="n" id="kVilles">0</div><div class="l">Villes prospectées</div></button>
+  </div>
+
+  <div class="panel search-panel">
+    <div class="search-bar">
+      <input class="inp search" id="citySearch" type="search" aria-label="Ville, département ou région à prospecter" placeholder="Ville, département ou région (ex. Bordeaux, Landes, Occitanie)">
+      <select class="inp zone-nb" id="zoneNb" aria-label="Nombre de villes à prospecter" title="Nombre de villes prospectées pour une région ou un département"><option value="5">5 villes</option><option value="10" selected>10 villes</option><option value="15">15 villes</option><option value="20">20 villes</option><option value="30">30 villes</option></select>
+      <button class="btn primary" id="citySearchBtn">Rechercher agences et mandataires</button>
+    </div>
+    <div class="zone-hint">Pour une région ou un département, ses principales villes sont prospectées une à une. Les résultats sont rangés par département puis par ville, avec le temps de route depuis Mérignac.</div>
+    <div class="search-status" id="searchStatus" style="display:none" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="result-tabs" id="resultTabs" role="group" aria-label="Résultats de recherche">
+    <button type="button" class="rtab active" id="tabAgence" data-tab="agence">Agences immobilières <span class="cnt" id="cntAgence">0</span></button>
+    <button type="button" class="rtab" id="tabMand" data-tab="mandataire">Mandataires immobiliers <span class="cnt" id="cntMand">0</span></button>
+  </div>
+  <div id="cityGroups"></div>
+  <div id="cityGroupsMand" style="display:none"></div>
+
+  <div class="section-h">Toutes les fiches</div>
+  <div class="bar">
+    <input class="inp search" id="q" type="search" aria-label="Rechercher dans les fiches" placeholder="Rechercher un nom, un secteur, un contact, une ville…">
+    <select class="inp" id="fType" aria-label="Filtrer par type"><option value="">Tous les types</option></select>
+    <select class="inp" id="fStat" aria-label="Filtrer par statut"><option value="">Tous les statuts</option></select>
+    <button class="btn primary" id="add">+ Nouvelle fiche</button>
+  </div>
+
+  <div class="panel">
+    <table aria-label="Toutes les fiches de prospection">
+      <thead><tr>
+        <th>Structure / secteur</th><th>Type</th><th>Contact</th><th>Ville</th>
+        <th>Visite</th><th>Canal</th><th>Statut</th><th>Relance</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div style="text-align:center;margin-top:12px"><button type="button" class="btn" id="moreRows" style="display:none">Afficher plus</button></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<form class="sheet" id="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="sTitle" aria-hidden="true" inert>
+  <div class="sheet-h"><h2 id="sTitle">Nouvelle fiche</h2><button type="button" class="x" id="close" aria-label="Fermer">&times;</button></div>
+  <div class="sheet-b">
+    <div class="field"><label for="f_type">Type de cible</label>
+      <select class="inp" id="f_type"></select></div>
+    <div class="field"><label for="f_nom">Nom de la structure / du secteur</label>
+      <input class="inp" id="f_nom" placeholder="ex. Agence Centre-ville ou Secteur Chartrons"></div>
+    <div class="field"><label for="f_contact">Nom du contact</label>
+      <input class="inp" id="f_contact" placeholder="ex. Garnier Sophie"></div>
+    <div class="field"><label for="f_adresse">Adresse</label>
+      <input class="inp" id="f_adresse" placeholder="12 rue Notre-Dame"></div>
+    <div class="row2">
+      <div class="field"><label for="f_ville">Ville</label><input class="inp" id="f_ville" placeholder="Bordeaux"></div>
+      <div class="field"><label for="f_tel">Téléphone</label><input class="inp" id="f_tel" placeholder="05 56 00 00 00"></div>
+    </div>
+    <div class="field"><label for="f_email">E-mail</label><input class="inp" type="email" id="f_email" placeholder="contact@agence.fr" autocomplete="off"></div>
+    <div class="field"><label for="f_canal">Canal</label><select class="inp" id="f_canal"></select></div>
+    <div class="row2">
+      <div class="field"><label for="f_date">Date de visite</label><input class="inp" type="date" id="f_date"></div>
+      <div class="field"><label for="f_relance">Prochaine relance</label><input class="inp" type="date" id="f_relance"></div>
+    </div>
+    <div class="field"><label for="f_statut">Statut</label><select class="inp" id="f_statut"></select></div>
+    <div class="field"><label for="f_notes">Notes</label><textarea class="inp" id="f_notes" placeholder="Interlocuteur, volume d'affaires, remarques…"></textarea></div>
+  </div>
+  <div class="sheet-f">
+    <button type="button" class="btn" id="del" style="margin-right:auto;display:none">Supprimer</button>
+    <button type="button" class="btn" id="cancel">Annuler</button>
+    <button type="submit" class="btn primary">Enregistrer</button>
+  </div>
+</form>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+var KEY="burdigala_prospection_v1";
+var $=function(s){return document.querySelector(s);};
+var TYPES=[["agence","Agence immobilière"],["mandataire","Mandataire immobilier"],["bailleur","Bailleur social"],["porte","Secteur porte-à-porte"],["particulier","Particulier"],["pro","Autre pro"]];
+var CANAUX=[["visite","Visite"],["appel","Appel"],["mail","Mail"],["porte","Porte-à-porte"]];
+var STATUTS=[["a_contacter","À contacter"],["contacte","Contactée"],["interesse","Intéressée"],["rdv","Rendez-vous"],["client","Client"],["sans_suite","Pas intéressée"],["a_rappeler","À rappeler"]];
+var SB_URL="https://joaqpgxsjlidvaadeyyu.supabase.co";
+var SB_ANON="sb_publishable_DEjtghTSM-fliRQKIX5Tpg_7TzF0Yk5";
+var openCities=new Set();
+var activeResultTab="agence";
+function showResultTab(tab){
+  activeResultTab=tab==="mandataire"?"mandataire":"agence";
+  $("#cityGroups").style.display=activeResultTab==="agence"?"":"none";
+  $("#cityGroupsMand").style.display=activeResultTab==="mandataire"?"":"none";
+  $("#tabAgence").classList.toggle("active",activeResultTab==="agence");
+  $("#tabMand").classList.toggle("active",activeResultTab==="mandataire");
+}
+function lab(list,v){for(var i=0;i<list.length;i++)if(list[i][0]===v)return list[i][1];return v||"—";}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function str(v){return v==null?"":String(v);}
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+/* JJ/MM/AA ; une date ancienne mal formée est affichée telle quelle (au lieu de « undefined/undefined »). */
+function fd(s){if(!s)return "—";var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));return m?(m[3]+"/"+m[2]+"/"+m[1].slice(2)):String(s);}
+function isoOk(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s);}
+/* Relance en retard : date dépassée (ou du jour) sur une fiche encore ouverte. */
+var STATUTS_CLOS={client:1,sans_suite:1};
+function relanceDue(f,today){return isoOk(f.relance)&&f.relance<=today&&!STATUTS_CLOS[f.statut];}
+function uid(){return "p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+var STATUT_OK={};STATUTS.forEach(function(s){STATUT_OK[s[0]]=1;});
+function statutValide(s){return STATUT_OK[s]?s:"a_contacter";}
+/* Données stockées : toujours un tableau de fiches (objets), sinon []. */
+function asFiches(v){
+  var a=Array.isArray(v)?v.filter(function(f){return f&&typeof f==="object"&&!Array.isArray(f);}):[];
+  /* Anciennes fiches sans identifiant : impossible à ouvrir / modifier → id attribué. */
+  a.forEach(function(f){if(f.id==null||f.id==="")f.id=uid();else if(typeof f.id!=="string")f.id=String(f.id);});
+  return a;
+}
+
+var fiches=[];
+try{var raw=localStorage.getItem(KEY);if(raw)fiches=asFiches(JSON.parse(raw));}catch(e){fiches=[];}
+var persistT=null;
+function persist(){
+  clearTimeout(persistT);persistT=null;
+  try{localStorage.setItem(KEY,JSON.stringify(fiches));return true;}
+  catch(e){toast("Enregistrement impossible : stockage du navigateur plein ou indisponible. Les dernières modifications ne sont pas sauvegardées.");return false;}
+}
+/* Écriture différée et regroupée (temps de route calculés pendant l'affichage). */
+function persistSoon(){clearTimeout(persistT);persistT=setTimeout(persist,400);}
+
+function fill(sel,list,all){
+  var h=all?'<option value="">'+all+"</option>":"";
+  for(var i=0;i<list.length;i++)h+='<option value="'+list[i][0]+'">'+list[i][1]+"</option>";
+  sel.innerHTML=h;
+}
+fill($("#fType"),TYPES,"Tous les types");
+fill($("#fStat"),STATUTS,"Tous les statuts");$("#fStat").insertAdjacentHTML("beforeend",'<option value="__contactes">Contactés (tous statuts)</option>');
+function matchStat(f,fs){return !fs||(fs==="__contactes"?f.statut!=="a_contacter":f.statut===fs);}
+fill($("#f_type"),TYPES);fill($("#f_canal"),CANAUX);fill($("#f_statut"),STATUTS);
+
+var toastT=null;
+function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("show");},Math.max(2200,Math.min(6000,String(m).length*55)));}
+
+function render(){
+  var today=iso(new Date());
+  $("#kTot").textContent=fiches.length;
+  var n=function(s){return fiches.filter(function(f){return f.statut===s;}).length;};
+  $("#kTodo").textContent=fiches.filter(function(f){return f.statut!=="a_contacter";}).length;
+  $("#kInt").textContent=n("a_rappeler");
+  $("#kCli").textContent=n("client");
+  $("#kRel").textContent=n("sans_suite");
+  var villesSet={};
+  fiches.forEach(function(f){if((f.type==="agence"||f.type==="mandataire")&&f.ville)villesSet[norm(f.ville)+"|"+depOf(f)]=1;});
+  $("#kVilles").textContent=Object.keys(villesSet).length;
+
+  renderCityGroups();
+
+  var q=$("#q").value.trim().toLowerCase(),ft=$("#fType").value,fs=$("#fStat").value;
+  var list=fiches.filter(function(f){
+    if(ft&&f.type!==ft)return false;
+    if(!matchStat(f,fs))return false;
+    if(!q)return true;
+    return [f.nom,f.contact,f.ville,f.adresse,f.notes].join(" ").toLowerCase().indexOf(q)>-1;
+  }).sort(function(a,b){
+    /* Relances dues en tête (les plus anciennes d'abord), puis visites les plus récentes. */
+    var ra=relanceDue(a,today),rb=relanceDue(b,today);
+    if(ra!==rb)return ra?-1:1;
+    if(ra&&rb)return str(a.relance).localeCompare(str(b.relance));
+    return str(b.date).localeCompare(str(a.date));
+  });
+
+  if(!list.length){
+    $("#rows").innerHTML='<tr><td colspan="9" class="empty">'+(fiches.length?"Aucune fiche ne correspond aux filtres.":"Aucune fiche pour le moment. Commence par « Nouvelle fiche ».")+"</td></tr>";
+    $("#moreRows").style.display="none";
+    return;
+  }
+  /* Liste longue : affichage par tranches (évite des milliers de lignes d'un coup). */
+  var total=list.length;list=list.slice(0,rowsLimit);
+  var mr=$("#moreRows");
+  if(total>list.length){mr.style.display="";mr.textContent="Afficher plus ("+list.length+" sur "+total+")";}else mr.style.display="none";
+  $("#rows").innerHTML=list.map(function(f){
+    var rel=f.relance?('<span class="'+(relanceDue(f,today)?"late":"")+'"'+(relanceDue(f,today)?' title="Relance à faire"':"")+'>'+esc(fd(f.relance))+"</span>"):"—";
+    return '<tr>'+
+      '<td data-l="Structure"><span class="nm">'+esc(f.nom||"—")+"</span>"+(f.adresse?'<div class="sm2">'+esc(f.adresse)+"</div>":"")+"</td>"+
+      '<td data-l="Type">'+esc(lab(TYPES,f.type))+"</td>"+
+      '<td data-l="Contact">'+esc(f.contact||"—")+"</td>"+
+      '<td data-l="Ville">'+esc(f.ville||"—")+"</td>"+
+      '<td data-l="Visite">'+esc(fd(f.date))+"</td>"+
+      '<td data-l="Canal">'+esc(lab(CANAUX,f.canal))+"</td>"+
+      '<td data-l="Statut">'+statutTag(f)+"</td>"+
+      '<td data-l="Relance">'+rel+"</td>"+
+      '<td data-l=""><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+(str(f.email).trim()?'<a class="btn sm" href="mailto:'+esc(str(f.email).trim())+'">Mail</a>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+      "</tr>";
+  }).join("");
+}
+
+/* Statut cliquable : 1 clic sur « À contacter » = « Contactée » (re-clic pour annuler). */
+var CHECK_SVG='<svg class="pi" viewBox="0 0 24 24" style="width:12px;height:12px;stroke-width:2.6"><path d="m5 12 5 5 9-10"/></svg>';
+function statutTag(f){
+  var l=esc(lab(STATUTS,f.statut));
+  if(f.statut==="a_contacter")return '<button type="button" class="tag tag-btn st-a_contacter" data-toggle="'+esc(f.id)+'" title="Cliquer pour marquer comme contactée">'+l+'</button>';
+  if(f.statut==="contacte")return '<button type="button" class="tag tag-btn st-contacte" data-toggle="'+esc(f.id)+'" title="Cliquer pour remettre à contacter">'+CHECK_SVG+l+'</button>';
+  return '<span class="tag st-'+esc(f.statut)+'">'+l+'</span>';
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("[data-toggle]");if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  var id=b.getAttribute("data-toggle"),f=null;
+  for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+  if(!f)return;
+  if(f.statut==="a_contacter"){f.statut="contacte";if(!f.date)f.date=iso(new Date());toast("« "+(f.nom||"Fiche")+" » marquée contactée");}
+  else if(f.statut==="contacte"){f.statut="a_contacter";toast("« "+(f.nom||"Fiche")+" » remise à contacter");}
+  else return;
+  persist();render();
+},true);
+function openEditor(id){
+  var f=null;for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+  if(f)openSheet(f);
+}
+
+/* Envoi au shell parent : uniquement si le module est bien chargé dans le CRM,
+   vers la même origine (sauf origine opaque « null » : file://, sandbox). */
+function postToShell(msg){
+  try{
+    if(!window.parent||window.parent===window)return false;
+    var o=location.origin;
+    window.parent.postMessage(msg,(o&&o!=="null")?o:"*");
+    return true;
+  }catch(err){return false;}
+}
+function sendToAgenda(f){
+  var ok=postToShell({__prospRdv:{
+    id:"pr"+f.id,client:(f.nom||"")+(f.contact?(" — "+f.contact):""),commune:f.ville||"",
+    adresse:f.adresse||"",tel:f.tel||"",date:f.relance,heure:"09:00",
+    notes:"Relance prospection ("+lab(TYPES,f.type)+")"+(f.notes?(" — "+f.notes):"")
+  }});
+  toast(ok?"Relance envoyée au calendrier":"Calendrier indisponible (ouvre la prospection depuis le CRM)");
+  return ok;
+}
+
+function createDevisFromFiche(f){
+  var ok=postToShell({__prospToDevis:{
+    nom:(f.nom||"")+(f.contact?(" — "+f.contact):""),
+    tel:f.tel||"",email:f.email||"",adresse:f.adresse||"",ville:f.ville||""
+  }});
+  if(!ok)toast("Devis indisponible (ouvre la prospection depuis le CRM)");
+}
+
+/* ---------- Régions, départements et temps de route depuis Mérignac ---------- */
+var ORIGINE={nom:"Mérignac",lat:44.8391346,lon:-0.6867939};
+var REGIONS={"84":"Auvergne-Rhône-Alpes","27":"Bourgogne-Franche-Comté","53":"Bretagne","24":"Centre-Val de Loire","94":"Corse","44":"Grand Est","32":"Hauts-de-France","11":"Île-de-France","28":"Normandie","75":"Nouvelle-Aquitaine","76":"Occitanie","52":"Pays de la Loire","93":"Provence-Alpes-Côte d’Azur","01":"Guadeloupe","02":"Martinique","03":"Guyane","04":"La Réunion","06":"Mayotte"};
+var DEP_REG={};
+(function(){
+  var m={"84":"01 03 07 15 26 38 42 43 63 69 73 74","27":"21 25 39 58 70 71 89 90","53":"22 29 35 56","24":"18 28 36 37 41 45","94":"2A 2B","44":"08 10 51 52 54 55 57 67 68 88","32":"02 59 60 62 80","11":"75 77 78 91 92 93 94 95","28":"14 27 50 61 76","75":"16 17 19 23 24 33 40 47 64 79 86 87","76":"09 11 12 30 31 32 34 46 48 65 66 81 82","52":"44 49 53 72 85","93":"04 05 06 13 83 84","01":"971","02":"972","03":"973","04":"974","06":"976"};
+  Object.keys(m).forEach(function(r){m[r].split(" ").forEach(function(d){DEP_REG[d]=r;});});
+})();
+var DEP_NOM={"01":"Ain","02":"Aisne","03":"Allier","04":"Alpes-de-Haute-Provence","05":"Hautes-Alpes","06":"Alpes-Maritimes","07":"Ardèche","08":"Ardennes","09":"Ariège","10":"Aube","11":"Aude","12":"Aveyron","13":"Bouches-du-Rhône","14":"Calvados","15":"Cantal","16":"Charente","17":"Charente-Maritime","18":"Cher","19":"Corrèze","2A":"Corse-du-Sud","2B":"Haute-Corse","21":"Côte-d’Or","22":"Côtes-d’Armor","23":"Creuse","24":"Dordogne","25":"Doubs","26":"Drôme","27":"Eure","28":"Eure-et-Loir","29":"Finistère","30":"Gard","31":"Haute-Garonne","32":"Gers","33":"Gironde","34":"Hérault","35":"Ille-et-Vilaine","36":"Indre","37":"Indre-et-Loire","38":"Isère","39":"Jura","40":"Landes","41":"Loir-et-Cher","42":"Loire","43":"Haute-Loire","44":"Loire-Atlantique","45":"Loiret","46":"Lot","47":"Lot-et-Garonne","48":"Lozère","49":"Maine-et-Loire","50":"Manche","51":"Marne","52":"Haute-Marne","53":"Mayenne","54":"Meurthe-et-Moselle","55":"Meuse","56":"Morbihan","57":"Moselle","58":"Nièvre","59":"Nord","60":"Oise","61":"Orne","62":"Pas-de-Calais","63":"Puy-de-Dôme","64":"Pyrénées-Atlantiques","65":"Hautes-Pyrénées","66":"Pyrénées-Orientales","67":"Bas-Rhin","68":"Haut-Rhin","69":"Rhône","70":"Haute-Saône","71":"Saône-et-Loire","72":"Sarthe","73":"Savoie","74":"Haute-Savoie","75":"Paris","76":"Seine-Maritime","77":"Seine-et-Marne","78":"Yvelines","79":"Deux-Sèvres","80":"Somme","81":"Tarn","82":"Tarn-et-Garonne","83":"Var","84":"Vaucluse","85":"Vendée","86":"Vienne","87":"Haute-Vienne","88":"Vosges","89":"Yonne","90":"Territoire de Belfort","91":"Essonne","92":"Hauts-de-Seine","93":"Seine-Saint-Denis","94":"Val-de-Marne","95":"Val-d’Oise","971":"Guadeloupe","972":"Martinique","973":"Guyane","974":"La Réunion","976":"Mayotte"};
+var REG_ALIAS={"aquitaine":"75","limousin":"75","poitou charentes":"75","poitou":"75","sud ouest":"75","midi pyrenees":"76","languedoc":"76","languedoc roussillon":"76","rhone alpes":"84","auvergne":"84","aura":"84","bourgogne":"27","franche comte":"27","bfc":"27","alsace":"44","lorraine":"44","champagne":"44","champagne ardenne":"44","nord pas de calais":"32","picardie":"32","hdf":"32","haute normandie":"28","basse normandie":"28","paca":"93","provence":"93","cote d azur":"93","sud":"93","idf":"11","region parisienne":"11","centre":"24","cvl":"24","reunion":"04","nouvelle aquitaine":"75"};
+function norm(s){return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[’']/g," ").replace(/[^a-z0-9]+/g," ").trim();}
+function depFromCp(cp){
+  cp=String(cp||"").trim();if(!/^\d{5}$/.test(cp))return "";
+  if(cp.slice(0,2)==="97")return cp.slice(0,3);
+  if(cp.slice(0,2)==="20")return (+cp<20200)?"2A":"2B";
+  return cp.slice(0,2);
+}
+function cpOf(f){
+  var c=String(f.cp||"").trim();if(/^\d{5}$/.test(c))return c;
+  var m=String(f.adresse||"").match(/\b(\d{5})\b/);return m?m[1]:"";
+}
+var GEO_KEY="burdigala_prospection_geo_v2",geo={};
+try{geo=JSON.parse(localStorage.getItem(GEO_KEY)||"{}")||{};}catch(e){geo={};}
+function saveGeo(){try{localStorage.setItem(GEO_KEY,JSON.stringify(geo));}catch(e){}}
+function geoKey(ville,dep){return norm(ville)+"|"+(dep||"");}
+function geoGet(ville,dep){return geo[geoKey(ville,dep)]||(dep?null:null);}
+function regionOf(f){
+  if(f.region)return f.region;
+  var d=depFromCp(cpOf(f));
+  if(d&&DEP_REG[d])return REGIONS[DEP_REG[d]];
+  var g=geo[geoKey(f.ville,"")];
+  if(g&&g.reg&&REGIONS[g.reg])return REGIONS[g.reg];
+  return "";
+}
+var SANS_DEP="Département non déterminé";
+function depOf(f){
+  var d=depFromCp(cpOf(f));if(d&&DEP_NOM[d])return d;
+  if(f.dep&&DEP_NOM[f.dep])return f.dep;
+  var g=geo[geoKey(f.ville,"")];if(g&&g.dep&&DEP_NOM[g.dep])return g.dep;
+  return "";
+}
+function depLabel(d){return d&&DEP_NOM[d]?(DEP_NOM[d]+" ("+d+")"):SANS_DEP;}
+function groupeOf(f){return depLabel(depOf(f));}
+/* Clé d'une ville : nom normalisé + département (deux homonymes restent distincts). */
+function cityKeyOf(f){return norm((f&&f.ville)||"Ville inconnue")+"|"+(f?depOf(f):"");}
+function fmtTrajet(g){
+  if(!g||g.min==null)return "";
+  if(g.min<5&&(g.km==null||g.km<=3))return "Sur place";
+  var h=Math.floor(g.min/60),m=g.min%60;
+  return (g.approx?"≈ ":"")+(h?(h+" h "+String(m).padStart(2,"0")):(m+" min"));
+}
+/* Temps de route enregistré dans les fiches de la ville (synchronisé avec le reste
+   du CRM) : une fois calculé, il n'est plus jamais recalculé. */
+function trajetFiches(vlist){
+  for(var i=0;i<vlist.length;i++){var t=vlist[i].trajet;if(t&&t.min!=null&&!t.approx)return t;}
+  for(var k=0;k<vlist.length;k++){var u=vlist[k].trajet;if(u&&u.min!=null)return u;}
+  return null;
+}
+function stampTrajet(ville,dep,g){
+  if(!g||g.min==null)return false;
+  var t={min:g.min,km:g.km,approx:!!g.approx,le:iso(new Date())},ch=false;
+  fiches.forEach(function(f){
+    if(norm(f.ville)!==norm(ville))return;
+    if(dep){var d=depFromCp(cpOf(f));if(d&&d!==dep)return;}
+    if(f.trajet&&f.trajet.min!=null&&!f.trajet.approx)return;
+    if(f.trajet&&f.trajet.min!=null&&f.trajet.approx&&g.approx)return;
+    f.trajet=t;ch=true;
+    if(!depFromCp(cpOf(f))){if(!f.dep&&g.dep&&DEP_NOM[g.dep])f.dep=g.dep;if(!f.region&&g.reg&&REGIONS[g.reg])f.region=REGIONS[g.reg];}
+  });
+  if(ch)persistSoon();
+  return ch;
+}
+/* Les temps de route repérés pendant l'affichage sont appliqués après coup,
+   en un seul lot, puis enregistrés une seule fois (écriture différée). */
+var stampQueue=[],stampT=null;
+function queueStamp(ville,dep,g){
+  stampQueue.push([ville,dep,g]);
+  if(!stampT)stampT=setTimeout(function(){
+    stampT=null;var q=stampQueue;stampQueue=[];
+    q.forEach(function(a){try{stampTrajet(a[0],a[1],a[2]);}catch(e){}});
+  },0);
+}
+var TRAJET_OFF='<span class="trajet wait" title="Temps de route non calculé : service de cartographie injoignable (réessai automatique au retour du réseau)">trajet indisponible</span>';
+var TRAJET_NONE='<span class="trajet wait" title="Commune introuvable : temps de route non disponible">—</span>';
+function trajetChip(ville,dep,vlist){
+  if(norm(ville)===norm(ORIGINE.nom))return '<span class="trajet" title="Ville de départ"><svg class="pi" viewBox="0 0 24 24"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>Sur place</span>';
+  var t=trajetFiches(vlist||[]),g=geo[geoKey(ville,dep)];
+  if(t&&!t.approx){
+    if(vlist.some(function(f){return !(f.trajet&&f.trajet.min!=null&&!f.trajet.approx);}))queueStamp(ville,dep,t);
+    g=t;
+  }else if(g&&g.min!=null&&!g.approx){
+    queueStamp(ville,dep,g);
+  }else{
+    if(!t&&g&&g.none)return TRAJET_NONE;
+    g=t||g;
+    needGeo(ville,dep);
+    /* Réseau indisponible : plus de « calcul… » sans fin. */
+    if((!g||g.min==null)&&geoFailed[geoKey(ville,dep)])return TRAJET_OFF;
+    if(!g||g.min==null)return '<span class="trajet wait" title="Calcul du temps de route depuis Mérignac…"><svg class="pi" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>calcul…</span>';
+  }
+  return '<span class="trajet" title="Temps de route estimé depuis Mérignac'+(g.km!=null?(" · "+g.km+" km"):"")+(g.approx?" (estimation provisoire, sera recalculée)":"")+'"><svg class="pi" viewBox="0 0 24 24"><path d="M5 17h14M6 17l1.5-5.5A2 2 0 0 1 9.4 10h5.2a2 2 0 0 1 1.9 1.5L18 17"/><circle cx="8" cy="17.5" r="1.6"/><circle cx="16" cy="17.5" r="1.6"/></svg>'+esc(fmtTrajet(g))+(fmtTrajet(g)!=="Sur place"?' <span class="tj-from">depuis Mérignac</span>':"")+"</span>";
+}
+/* Correction calée sur Google Maps (12 trajets depuis Mérignac, écart ±5 %) :
+   le moteur d'itinéraire libre sous-estime la circulation urbaine et
+   surestime légèrement les longs trajets. */
+function calibre(m){
+  var f=m<=20?1.3:(m>=40?0.955:1.3+(0.955-1.3)*(m-20)/20);
+  return Math.round(m*f);
+}
+function hav(a,b,c,d){var R=6371,r=Math.PI/180,x=Math.sin((c-a)*r/2),y=Math.sin((d-b)*r/2);var h=x*x+Math.cos(a*r)*Math.cos(c*r)*y*y;return 2*R*Math.asin(Math.sqrt(h));}
+var geoQueue=[],geoBusy=false,geoTried={},geoFailed={},geoRenderT=null;
+/* fetch avec délai maximal : un service muet ne bloque plus la file des calculs. */
+function fetchT(url,ms){
+  var ctl=null;try{ctl=new AbortController();}catch(e){}
+  var t=setTimeout(function(){try{if(ctl)ctl.abort();}catch(e){}},ms||10000);
+  return fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(t);return r;},function(e){clearTimeout(t);throw e;});
+}
+/* Retour du réseau : les villes en échec sont recalculées. */
+window.addEventListener("online",function(){Object.keys(geoFailed).forEach(function(k){delete geoTried[k];});geoFailed={};geoRerender();});
+function needGeo(ville,dep){
+  if(!ville||ville==="Ville inconnue")return;
+  var k=geoKey(ville,dep);
+  if(geoTried[k])return;geoTried[k]=1;
+  if(geo[k]&&geo[k].none)return;
+  geoQueue.push({k:k,ville:ville,dep:dep||""});
+  setTimeout(runGeo,0);
+}
+function geoRerender(){clearTimeout(geoRenderT);geoRenderT=setTimeout(function(){try{renderCityGroups();}catch(e){}},250);}
+async function runGeo(){
+  if(geoBusy)return;geoBusy=true;
+  try{
+    while(geoQueue.length){
+      if(typeof navigator!=="undefined"&&navigator.onLine===false){geoQueue.forEach(function(x){geoFailed[x.k]=1;});geoQueue.length=0;geoRerender();break;}
+      var it=geoQueue.shift();
+      var ok=false;
+      try{ok=await geoResolve(it);}catch(e){ok=false;}
+      if(ok)geoRerender();
+      else{geoFailed[it.k]=1;geoRerender();}
+    }
+  }finally{geoBusy=false;}
+}
+async function geoResolve(it){
+  var g=Object.assign({},geo[it.k]||{});
+  if(g.none)return false;
+  if(g.lat==null){
+    var url="https://geo.api.gouv.fr/communes?nom="+encodeURIComponent(it.ville)+(it.dep?"&codeDepartement="+encodeURIComponent(it.dep):"")+"&fields=nom,centre,mairie,codeRegion,codeDepartement,population&boost=population&limit=5";
+    var r=await fetchT(url,10000);if(!r.ok)return false;
+    var a=await r.json();if(!Array.isArray(a)||!a.length){g.none=1;geo[it.k]=g;saveGeo();return true;}
+    var n=norm(it.ville),c=null;
+    for(var i=0;i<a.length;i++)if(norm(a[i].nom)===n){c=a[i];break;}
+    c=c||a[0];
+    var pt=(c.mairie&&c.mairie.coordinates)||(c.centre&&c.centre.coordinates);if(!pt)return false;
+    g.lon=pt[0];g.lat=pt[1];g.reg=c.codeRegion||"";g.dep=c.codeDepartement||"";
+  }
+  if(g.min==null||g.approx){
+    try{
+      var u="https://router.project-osrm.org/route/v1/driving/"+ORIGINE.lon+","+ORIGINE.lat+";"+g.lon+","+g.lat+"?overview=false";
+      var r2=await fetchT(u,10000);var j=await r2.json();
+      if(j&&j.code==="Ok"&&j.routes&&j.routes[0]){g.min=calibre(j.routes[0].duration/60);g.km=Math.round(j.routes[0].distance/1000);g.approx=false;}
+      else throw new Error("osrm");
+    }catch(e){
+      if(g.min==null){var km=hav(ORIGINE.lat,ORIGINE.lon,g.lat,g.lon)*1.3;g.km=Math.round(km);g.min=Math.round(km/80*60+(km>2?6:0));g.approx=true;}
+    }
+  }
+  geo[it.k]=g;
+  if(it.dep===""&&g.dep){var k2=geoKey(it.ville,g.dep);if(!geo[k2])geo[k2]=g;}
+  saveGeo();
+  try{stampTrajet(it.ville,it.dep,g);}catch(e){}
+  return true;
+}
+var closedRegions=new Set();
+function detectZone(raw){
+  var n=norm(raw);if(!n)return null;
+  var code=null;
+  Object.keys(REGIONS).forEach(function(c){if(!code&&norm(REGIONS[c])===n)code=c;});
+  if(!code&&REG_ALIAS[n])code=REG_ALIAS[n];
+  if(code)return {kind:"region",code:code,nom:REGIONS[code]};
+  var d=null,s=n.replace(/^(departement|dept|dep)\s+(du |de la |de l |des |de )?/,"");
+  if(/^(\d{1,3}|2a|2b)$/.test(s)){var c2=s.toUpperCase();if(c2.length===1)c2="0"+c2;if(DEP_NOM[c2])d=c2;}
+  if(!d)Object.keys(DEP_NOM).forEach(function(c){if(!d&&norm(DEP_NOM[c])===s&&s!=="paris")d=c;});
+  if(d)return {kind:"dep",code:d,nom:DEP_NOM[d],reg:DEP_REG[d]};
+  return null;
+}
+
+function cityGroupsHTML(type,singular,plural,emptyIdleHint){
+  var q=$("#q").value.trim().toLowerCase(),fs=$("#fStat").value;
+  var all=fiches.filter(function(f){return f.type===type;});
+  var list=all;
+  if(fs)list=list.filter(function(f){return matchStat(f,fs);});
+  if(q)list=list.filter(function(f){return [f.nom,f.contact,f.ville,f.adresse,f.notes,f.reseau,groupeOf(f),regionOf(f)].join(" ").toLowerCase().indexOf(q)>-1;});
+  if(!list.length){
+    return '<div class="panel"><div class="empty">'+(all.length?("Aucun "+singular+" ne correspond aux filtres."):emptyIdleHint)+"</div></div>";
+  }
+  var showReseau=type==="mandataire";
+  var caretO="<svg class='pi' viewBox='0 0 24 24'><path d='m6 9 6 6 6-6'/></svg>",caretC="<svg class='pi' viewBox='0 0 24 24'><path d='m9 6 6 6-6 6'/></svg>";
+  var byReg={};
+  list.forEach(function(f){
+    var r=groupeOf(f),v=str(f.ville).trim()||"Ville inconnue",vk=norm(v)||"ville inconnue";
+    /* Regroupement insensible à la casse / aux accents (« bordeaux » = « Bordeaux »). */
+    var R=byReg[r]=byReg[r]||{n:0,villes:{},noms:{}};R.n++;
+    (R.villes[vk]=R.villes[vk]||[]).push(f);
+    if(!R.noms[vk]||(R.noms[vk]===R.noms[vk].toLowerCase()&&v!==v.toLowerCase()))R.noms[vk]=v;
+  });
+  var regs=Object.keys(byReg).sort(function(a,b){
+    if(a===SANS_DEP)return 1;if(b===SANS_DEP)return -1;
+    return byReg[b].n-byReg[a].n||a.localeCompare(b);
+  });
+  return regs.map(function(rg){
+    var R=byReg[rg],ropen=!closedRegions.has(rg);
+    var villes=Object.keys(R.villes).sort(function(a,b){return R.villes[b].length-R.villes[a].length||a.localeCompare(b);});
+    var inner=villes.map(function(vk){
+      var v=R.noms[vk];
+      var vlist=R.villes[vk].sort(function(a,b){return str(a.nom).localeCompare(str(b.nom));});
+      var ck=cityKeyOf(vlist[0]),open=openCities.has(ck),dep="";
+      for(var i=0;i<vlist.length&&!dep;i++)dep=depFromCp(cpOf(vlist[i]));
+      var rows=vlist.map(function(f){
+        var tel=str(f.tel).trim();
+        return '<tr>'+
+          '<td data-l="'+(showReseau?"Mandataire":"Agence")+'"><span class="nm">'+esc(f.nom||"—")+"</span></td>"+
+          (showReseau?('<td data-l="Réseau">'+(f.reseau?('<span class="tag">'+esc(f.reseau)+"</span>"):"—")+"</td>"):"")+
+          '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
+          '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
+          '<td data-l="Statut">'+statutTag(f)+"</td>"+
+          '<td data-l=""><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+(str(f.email).trim()?'<a class="btn sm" href="mailto:'+esc(str(f.email).trim())+'">Mail</a>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+          "</tr>";
+      }).join("");
+      return '<div class="city-group">'+
+        '<button type="button" class="city-h" data-city="'+esc(ck)+'" aria-expanded="'+(open?"true":"false")+'"><span class="city-caret">'+(open?caretO:caretC)+'</span><span class="city-t">'+esc(v)+" — "+vlist.length+" "+(vlist.length>1?plural:singular)+"</span>"+(v!=="Ville inconnue"?trajetChip(v,dep,vlist):"")+"</button>"+
+        '<div class="city-b" style="display:'+(open?"block":"none")+'"><table><thead><tr><th>'+(showReseau?"Mandataire":"Agence")+'</th>'+(showReseau?"<th>Réseau</th>":"")+'<th>Téléphone</th><th>Adresse</th><th>Statut</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>"+
+        "</div>";
+    }).join("");
+    return '<div class="region-group">'+
+      '<div class="region-hw"><button type="button" class="region-h" data-region="'+esc(rg)+'" aria-expanded="'+(ropen?"true":"false")+'"><span class="city-caret">'+(ropen?caretO:caretC)+'</span><span class="region-t">'+esc(rg)+'</span><span class="region-m">'+villes.length+" ville"+(villes.length>1?"s":"")+" · "+R.n+" "+(R.n>1?plural:singular)+'</span></button>'+
+      '<button type="button" class="region-del" data-delregion="'+esc(rg)+'" title="Supprimer ce département" aria-label="Supprimer le département '+esc(rg)+'"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></div>'+
+      '<div class="region-b" style="display:'+(ropen?"block":"none")+'">'+inner+"</div>"+
+      "</div>";
+  }).join("");
+}
+
+function ficheTravaillee(f){return f.statut!=="a_contacter"||!!(f.notes||f.contact||f.relance||f.date);}
+function supprimerRegion(rg){
+  var dans=fiches.filter(function(f){return (f.type==="agence"||f.type==="mandataire")&&groupeOf(f)===rg;});
+  if(!dans.length)return;
+  var neuves=dans.filter(function(f){return !ficheTravaillee(f);}),trav=dans.filter(ficheTravaillee);
+  var nA=neuves.filter(function(f){return f.type==="agence";}).length,nM=neuves.length-nA;
+  var aSuppr=[];
+  if(neuves.length){
+    var msg="Supprimer le département « "+rg+" » ?\n\n"+(nA?nA+" agence"+(nA>1?"s":""):"")+(nA&&nM?" et ":"")+(nM?nM+" mandataire"+(nM>1?"s":""):"")+" à contacter ser"+(neuves.length>1?"ont":"a")+" supprimé"+(neuves.length>1?"s":"")+".";
+    if(trav.length)msg+="\n\n"+trav.length+" fiche"+(trav.length>1?"s":"")+" déjà travaillée"+(trav.length>1?"s":"")+" (contactée, à rappeler, client…) "+(trav.length>1?"sont conservées":"est conservée")+".";
+    if(!window.confirm(msg))return;
+    aSuppr=neuves.slice();
+  }
+  if(trav.length){
+    var noms=trav.slice(0,6).map(function(f){return "· "+(f.nom||"—")+(f.ville?" ("+f.ville+")":"");}).join("\n")+(trav.length>6?"\n…":"");
+    if(window.confirm((neuves.length?"Supprimer aussi ":"Supprimer ")+(trav.length>1?("les "+trav.length+" fiches déjà travaillées"):"la fiche déjà travaillée")+" de « "+rg+" » ?\n\n"+noms+"\n\nCette suppression est définitive."))aSuppr=aSuppr.concat(trav);
+  }
+  if(!aSuppr.length)return;
+  var ids={};aSuppr.forEach(function(f){ids[f.id]=1;});
+  fiches=fiches.filter(function(f){return !ids[f.id];});
+  persist();render();
+  toast(aSuppr.length+" fiche"+(aSuppr.length>1?"s":"")+" supprimée"+(aSuppr.length>1?"s":"")+" · "+rg);
+}
+function renderCityGroups(){
+  $("#cityGroups").innerHTML=cityGroupsHTML("agence","agence","agences","Recherche une ville ci-dessus pour trouver des agences immobilières.");
+  $("#cityGroupsMand").innerHTML=cityGroupsHTML("mandataire","mandataire","mandataires","Recherche une ville ci-dessus pour trouver ses mandataires SAFTI, iad, Capifrance, Optimhome et BSK Immobilier.");
+  $("#cntAgence").textContent=fiches.filter(function(f){return f.type==="agence";}).length;
+  $("#cntMand").textContent=fiches.filter(function(f){return f.type==="mandataire";}).length;
+}
+function onCityGroupsClick(e){
+  var dr=e.target.closest("[data-delregion]");
+  if(dr){e.preventDefault();e.stopPropagation();supprimerRegion(dr.getAttribute("data-delregion"));return;}
+  var rh=e.target.closest(".region-h");
+  if(rh){var rg=rh.getAttribute("data-region");if(closedRegions.has(rg))closedRegions.delete(rg);else closedRegions.add(rg);renderCityGroups();return;}
+  var h=e.target.closest(".city-h");
+  if(h){var v=h.getAttribute("data-city");if(openCities.has(v))openCities.delete(v);else openCities.add(v);renderCityGroups();return;}
+  var editBtn=e.target.closest("button[data-edit]");
+  if(editBtn){openEditor(editBtn.getAttribute("data-edit"));return;}
+  var calBtn=e.target.closest("button[data-cal]");
+  if(calBtn){
+    var id=calBtn.getAttribute("data-cal"),f=null;
+    for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+    if(f)sendToAgenda(f);
+    return;
+  }
+  var devisBtn=e.target.closest("button[data-devis]");
+  if(devisBtn){
+    var did=devisBtn.getAttribute("data-devis"),df=null;
+    for(var j=0;j<fiches.length;j++)if(fiches[j].id===did)df=fiches[j];
+    if(df)createDevisFromFiche(df);
+  }
+}
+
+function setSearchStatus(kind,msg){
+  var el=$("#searchStatus");
+  if(!kind){el.style.display="none";el.className="search-status";return;}
+  el.className="search-status "+kind;
+  el.innerHTML=(kind==="loading"?'<span class="spin"></span>':"")+"<span>"+esc(msg)+"</span>";
+  el.style.display="flex";
+}
+
+var sbClient=null;
+function getSbClient(){
+  if(sbClient)return sbClient;
+  if(typeof window.supabase==="undefined"||!window.supabase.createClient)return null;
+  try{sbClient=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:false,storage:window.localStorage,storageKey:"burdigala_sb_auth"}});}catch(e){sbClient=null;}
+  return sbClient;
+}
+
+/* ---------- Recherche groupée : agences + mandataires d'une même ville ----------
+   Une seule recherche interroge les deux sources, puis chaque résultat est rangé
+   dans la bonne case :
+   - Mandataires : uniquement les réseaux SAFTI, iad, Capifrance, Optimhome et BSK Immobilier.
+   - Agences : agences immobilières classiques ; tout résultat portant le nom
+     d'un réseau de mandataires (ou se présentant comme mandataire / agent
+     commercial) en est exclu. */
+var RESEAUX_MAND=[
+  {nom:"SAFTI",re:/\bsafti\b/i},
+  {nom:"iad",re:/\biad\b/i},
+  {nom:"Capifrance",re:/capi\s*-?\s*france/i},
+  {nom:"Optimhome",re:/optimhome/i},
+  {nom:"BSK Immobilier",re:/\bbsk\b/i}
+];
+var AUTRES_MAND=/propri[eé]t[eé]s?[\s-]*priv[eé]es|megagence|efficity|3g[\s-]*immo|expertimo|dr\.?\s*house|sextant|immo[\s-]*r[eé]seau|bl[\s-]*agents|lux[\s-]*courtage|mandataire|agent\s+commercial|conseill[eè]re?\s+(immobili|ind[eé]pendant)/i;
+function reseauMandataire(r){
+  var t=[r.reseau||"",r.nom||""].join(" ");
+  for(var i=0;i<RESEAUX_MAND.length;i++)if(RESEAUX_MAND[i].re.test(t))return RESEAUX_MAND[i].nom;
+  return "";
+}
+function classerResultat(r,source){
+  var res=reseauMandataire(r);
+  if(res)return {type:"mandataire",reseau:res};
+  if(source==="agence"&&!AUTRES_MAND.test([r.reseau||"",r.nom||""].join(" ")))return {type:"agence",reseau:""};
+  return null;
+}
+/* Fiches déjà enregistrées par une recherche : on remet dans la bonne case
+   celles qui portent le nom d'un des 4 réseaux de mandataires. */
+(function(){
+  var ch=false;
+  fiches.forEach(function(f){
+    if(f&&f.source==="api"&&f.type==="agence"){var res=reseauMandataire(f);if(res){f.type="mandataire";f.reseau=res;ch=true;}}
+  });
+  if(ch)persist();
+})();
+var searching=false,zoneAbort=false;
+var SEARCH_TIMEOUT=20000;
+/* Statut HTTP d'une erreur Supabase (FunctionsHttpError.context = Response). */
+function errStatus(e){
+  if(!e)return 0;
+  if(e.context&&typeof e.context.status==="number")return e.context.status;
+  if(typeof e.status==="number")return e.status;
+  return 0;
+}
+function erreurBloquante(st){return st===401||st===403||st===429;}
+function msgErreur(e){
+  var st=errStatus(e);
+  if(st===401||st===403)return "session expirée ou accès refusé — reconnecte-toi depuis le tableau de bord du CRM";
+  if(st===429)return "quota de recherche atteint — réessaie plus tard";
+  if(e&&e.timeout)return "le service n'a pas répondu en 20 s";
+  /* Erreurs réseau brutes (anglais, techniques) → message clair. */
+  var m=String((e&&e.message)||"");
+  if(e&&e.reseau)return m;
+  if((e&&(e.name==="TypeError"||e.name==="FunctionsFetchError"||e.name==="AbortError"))||/failed to fetch|failed to send|networkerror|load failed|network request failed|aborted/i.test(m))
+    return "réseau indisponible ou service de recherche injoignable — vérifie la connexion puis réessaie";
+  if(e&&e.name==="FunctionsRelayError")return "service de recherche momentanément indisponible";
+  if(e&&e.name==="FunctionsHttpError")return "le service de recherche a renvoyé une erreur"+(errStatus(e)?" ("+errStatus(e)+")":"");
+  return m||"service indisponible";
+}
+/* Appel de la fonction de recherche avec délai maximal (20 s). */
+function invokeRecherche(client,body){
+  var ctl=null,timer=null;
+  try{ctl=typeof AbortController!=="undefined"?new AbortController():null;}catch(e){ctl=null;}
+  var appel=client.functions.invoke("search-agences",ctl?{body:body,signal:ctl.signal}:{body:body});
+  var delai=new Promise(function(_,rej){
+    timer=setTimeout(function(){
+      try{if(ctl)ctl.abort();}catch(x){}
+      var e=new Error("délai dépassé");e.timeout=true;rej(e);
+    },SEARCH_TIMEOUT);
+  });
+  return Promise.race([appel,delai]).then(function(r){clearTimeout(timer);return r;},function(e){clearTimeout(timer);throw e;});
+}
+/* Rapprochement d'un résultat avec une fiche existante :
+   placeId, sinon nom + adresse normalisés, sinon nom + 9 derniers chiffres du téléphone. */
+function tel9(x){var d=String(x||"").replace(/\D/g,"");return d.length>=9?d.slice(-9):"";}
+function cleNomAdr(nom,adr){var n=norm(nom),a=norm(adr);return (n&&a&&n!=="—")?(n+"|"+a):"";}
+function cleNomTel(nom,tel){var n=norm(nom),t=tel9(tel);return (n&&t)?(n+"|"+t):"";}
+function indexFiches(){
+  var idx={place:{},adr:{},tel:{}};
+  fiches.forEach(function(f){
+    if(!f)return;
+    if(f.placeId&&!idx.place[f.placeId])idx.place[f.placeId]=f;
+    var ka=cleNomAdr(f.nom,f.adresse);if(ka&&!idx.adr[ka])idx.adr[ka]=f;
+    var kt=cleNomTel(f.nom,f.tel);if(kt&&!idx.tel[kt])idx.tel[kt]=f;
+  });
+  return idx;
+}
+function indexer(idx,f){
+  if(f.placeId&&!idx.place[f.placeId])idx.place[f.placeId]=f;
+  var ka=cleNomAdr(f.nom,f.adresse);if(ka&&!idx.adr[ka])idx.adr[ka]=f;
+  var kt=cleNomTel(f.nom,f.tel);if(kt&&!idx.tel[kt])idx.tel[kt]=f;
+}
+function trouverFiche(idx,r){
+  return (r.placeId&&idx.place[r.placeId])||idx.adr[cleNomAdr(r.nom,r.adresse)]||idx.tel[cleNomTel(r.nom,r.tel)]||null;
+}
+function vide(v){return v==null||String(v).trim()===""||v==="—";}
+async function rechercherVille(client,ville){
+  var appels=await Promise.all(["agence","mandataire"].map(function(type){
+    return invokeRecherche(client,{ville:ville,type:type})
+      .then(function(res){if(res.error)throw res.error;return {type:type,results:(res.data&&res.data.results)||[]};})
+      .catch(function(err){return {type:type,error:err,results:[]};});
+  }));
+  var erreurs=appels.filter(function(a){return a.error;});
+  var bloquante=0;erreurs.forEach(function(a){var st=errStatus(a.error);if(!bloquante&&erreurBloquante(st))bloquante=st;});
+  if(erreurs.length===appels.length)throw erreurs[0].error;
+  var vus={},nb={agence:{add:0,upd:0},mandataire:{add:0,upd:0}},ecartes=0,villeRes="";
+  var idx=indexFiches();
+  appels.forEach(function(a){
+    a.results.forEach(function(r){
+      if(!r)return;
+      var cle=r.placeId||cleNomAdr(r.nom,r.adresse)||((r.nom||"")+"|"+(r.adresse||"")).toLowerCase();
+      if(vus[cle])return;vus[cle]=1;
+      var c=classerResultat(r,a.type);
+      if(!c){ecartes++;return;}
+      if(!villeRes)villeRes=r.ville||"";
+      var existing=trouverFiche(idx,r);
+      if(existing){
+        /* Fiche déjà connue : on complète seulement les champs vides,
+           sans jamais toucher au type ni aux saisies de l'utilisateur. */
+        if(vide(existing.nom)&&r.nom)existing.nom=r.nom;
+        if(vide(existing.tel)&&r.tel)existing.tel=r.tel;
+        if(vide(existing.adresse)&&r.adresse)existing.adresse=r.adresse;
+        if(vide(existing.cp)&&r.cp)existing.cp=r.cp;
+        if(vide(existing.ville)&&r.ville)existing.ville=r.ville;
+        if(!existing.placeId&&r.placeId)existing.placeId=r.placeId;
+        if(vide(existing.reseau)&&c.reseau)existing.reseau=c.reseau;
+        if(!existing.type)existing.type=c.type;
+        indexer(idx,existing);
+        nb[c.type].upd++;
+      }else{
+        var nf={id:uid(),type:c.type,nom:r.nom||"—",contact:"",adresse:r.adresse||"",ville:r.ville||ville,cp:r.cp||"",tel:r.tel||"",canal:"visite",date:"",relance:"",statut:"a_contacter",notes:"",placeId:r.placeId||null,source:"api",reseau:c.reseau||""};
+        fiches.push(nf);indexer(idx,nf);
+        nb[c.type].add++;
+      }
+    });
+  });
+  persist();
+  return {nb:nb,ecartes:ecartes,villeRes:villeRes,erreurs:erreurs.length,bloquante:bloquante};
+}
+function precheck(){
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){
+    setSearchStatus("error","Hors connexion — impossible de lancer une nouvelle recherche. Les fiches déjà enregistrées restent consultables ci-dessous.");
+    return null;
+  }
+  var client=getSbClient();
+  if(!client){setSearchStatus("error","Service de recherche indisponible (connexion au CRM impossible).");return null;}
+  return client;
+}
+async function sessionOk(client){
+  var sess=null;
+  try{var r0=await client.auth.getSession();sess=r0.data&&r0.data.session;}catch(e){}
+  if(!sess){setSearchStatus("error","Connecte-toi depuis le tableau de bord du CRM pour lancer une recherche.");return false;}
+  return true;
+}
+function setSearching(on,zone){
+  searching=on;
+  var b=$("#citySearchBtn");
+  b.disabled=on&&!zone;
+  b.textContent=on&&zone?"Arrêter la recherche":"Rechercher agences et mandataires";
+  b.classList.toggle("stop",!!(on&&zone));
+}
+function searchCity(villeRaw){
+  var ville=(villeRaw||"").trim();
+  if(!ville||searching)return;
+  var client=precheck();if(!client)return;
+  setSearching(true,false);
+  setSearchStatus("loading","Recherche des agences et des mandataires à "+ville+"…");
+  (async function(){
+    try{
+      if(!(await sessionOk(client)))return;
+      var res=await rechercherVille(client,ville),nb=res.nb;
+      var vr=res.villeRes||ville;
+      var vf=fiches.find(function(f){return f.ville===vr;});
+      if(vf)openCities.add(cityKeyOf(vf));
+      var nA=nb.agence.add+nb.agence.upd,nM=nb.mandataire.add+nb.mandataire.upd;
+      if(nM&&!nA)showResultTab("mandataire");else showResultTab("agence");
+      render();
+      if(!nA&&!nM){setSearchStatus("empty","Aucune agence ni aucun mandataire (SAFTI, iad, Capifrance, Optimhome, BSK) trouvé pour « "+ville+" ».");return;}
+      var any=fiches.find(function(f){return f.ville===vr;});
+      if(any)closedRegions.delete(groupeOf(any));
+      setSearchStatus("ok",ville+" : "+nA+" agence"+(nA>1?"s":"")+" ("+nb.agence.add+" nouvelle"+(nb.agence.add>1?"s":"")+") et "+nM+" mandataire"+(nM>1?"s":"")+" SAFTI / iad / Capifrance / Optimhome / BSK ("+nb.mandataire.add+" nouveau"+(nb.mandataire.add>1?"x":"")+")"+(res.ecartes?" — "+res.ecartes+" résultat"+(res.ecartes>1?"s":"")+" hors cible écarté"+(res.ecartes>1?"s":""):"")+(res.erreurs?" — une des deux recherches n'a pas répondu.":"."));
+    }catch(err){
+      setSearchStatus("error","Erreur lors de la recherche : "+msgErreur(err)+".");
+    }finally{
+      setSearching(false);
+    }
+  })();
+}
+async function villesDeZone(z,n){
+  /* 1) Liste légère (nom, population, département) pour choisir les N plus peuplées… */
+  var url="https://geo.api.gouv.fr/communes?"+(z.kind==="region"?"codeRegion=":"codeDepartement=")+encodeURIComponent(z.code)+"&fields=nom,code,population,codeDepartement&format=json";
+  var r;
+  try{r=await fetchT(url,15000);}catch(e){var ne=new Error("liste des villes injoignable (réseau indisponible ?)");ne.reseau=true;throw ne;}
+  if(!r.ok)throw new Error("liste des villes indisponible");
+  var a=await r.json();
+  a=(Array.isArray(a)?a:[]).filter(function(c){return c&&c.nom;}).sort(function(x,y){return (y.population||0)-(x.population||0);}).slice(0,n);
+  /* 2) …puis coordonnées (mairie / centre) uniquement pour les villes retenues. */
+  await Promise.all(a.map(function(c){
+    if(!c.code)return null;
+    var k1=geoKey(c.nom,c.codeDepartement||"");
+    if(geo[k1]&&geo[k1].lat!=null)return null;
+    return fetchT("https://geo.api.gouv.fr/communes/"+encodeURIComponent(c.code)+"?fields=nom,centre,mairie,codeRegion,codeDepartement&format=json")
+      .then(function(r2){return r2.ok?r2.json():null;})
+      .then(function(d){
+        if(!d)return;
+        var pt=(d.mairie&&d.mairie.coordinates)||(d.centre&&d.centre.coordinates);if(!pt)return;
+        var dep=d.codeDepartement||c.codeDepartement||"";
+        var g={lon:pt[0],lat:pt[1],reg:d.codeRegion||DEP_REG[dep]||"",dep:dep};
+        [geoKey(c.nom,dep),geoKey(c.nom,"")].forEach(function(k){if(!geo[k]||geo[k].lat==null)geo[k]=Object.assign({},g);});
       })
-      .catch(() => caches.match(req).then((cached) => {
-        if (cached) return cached;
-        // Repli sur index.html uniquement pour une navigation de page
-        // (jamais pour une iframe — sinon l'app complète se chargeait dans
-        // l'iframe Prospection —, ni pour un script, une image ou du JSON).
-        if (req.mode === "navigate" && req.destination === "document") return caches.match("./index.html");
-        return Response.error();
-      }))
-  );
+      .catch(function(){});
+  }));
+  saveGeo();
+  return a;
+}
+function searchZone(raw){
+  var txt=(raw||"").trim();
+  if(!txt)return;
+  if(searching){if(zoneRun)zoneAbort=true;return;}
+  var z=detectZone(txt);
+  if(!z){searchCity(txt);return;}
+  var client=precheck();if(!client)return;
+  var n=parseInt(($("#zoneNb")||{}).value||"10",10)||10;
+  var lib=(z.kind==="region"?"la région ":"le département ")+z.nom;
+  setSearching(true,true);zoneRun=true;zoneAbort=false;
+  setSearchStatus("loading","Recherche des principales villes de "+lib+"…");
+  (async function(){
+    var tot={aAdd:0,aUpd:0,mAdd:0,mUpd:0},faites=0,err=0,errSuite=0,arret="";
+    try{
+      if(!(await sessionOk(client)))return;
+      var villes=await villesDeZone(z,n);
+      if(!villes.length){setSearchStatus("empty","Aucune ville trouvée pour "+lib+".");return;}
+      if(!window.confirm("Prospecter les "+villes.length+" principales villes de "+lib+" ?\n\n"+villes.map(function(c){return c.nom;}).join(", ")+"\n\nChaque ville lance une recherche agences + mandataires."))
+        {setSearchStatus("");return;}
+      var regNom=REGIONS[z.kind==="region"?z.code:z.reg]||"";
+      Object.keys(DEP_NOM).forEach(function(d){if(z.kind==="dep"?d===z.code:DEP_REG[d]===z.code)closedRegions.delete(depLabel(d));});
+      for(var i=0;i<villes.length;i++){
+        if(zoneAbort)break;
+        var v=villes[i];
+        setSearchStatus("loading",z.nom+" — ville "+(i+1)+"/"+villes.length+" : "+v.nom+"…");
+        try{
+          var res=await rechercherVille(client,v.nom);
+          tot.aAdd+=res.nb.agence.add;tot.aUpd+=res.nb.agence.upd;tot.mAdd+=res.nb.mandataire.add;tot.mUpd+=res.nb.mandataire.upd;
+          errSuite=0;
+          if(res.bloquante)arret=msgErreur({status:res.bloquante});
+        }catch(e){
+          err++;errSuite++;
+          if(erreurBloquante(errStatus(e)))arret=msgErreur(e);
+          else if(errSuite>=2)arret="2 villes de suite sans réponse ("+msgErreur(e)+")";
+        }
+        faites++;
+        render();
+        if(arret)break;
+      }
+      var nA=tot.aAdd+tot.aUpd,nM=tot.mAdd+tot.mUpd;
+      if(nM&&!nA)showResultTab("mandataire");else showResultTab("agence");
+      render();
+      if(!nA&&!nM){setSearchStatus(err||arret?"error":"empty",(arret?("Recherche arrêtée : "+arret):(err?"La recherche n'a pas abouti":"Aucune agence ni aucun mandataire trouvé"))+" pour "+lib+".");return;}
+      setSearchStatus(arret?"error":"ok",(arret?"Recherche arrêtée : "+arret+". ":"")+z.nom+" : "+faites+" ville"+(faites>1?"s":"")+" prospectée"+(faites>1?"s":"")+(zoneAbort?" (recherche arrêtée)":"")+" — "+nA+" agence"+(nA>1?"s":"")+" ("+tot.aAdd+" nouvelle"+(tot.aAdd>1?"s":"")+") et "+nM+" mandataire"+(nM>1?"s":"")+" ("+tot.mAdd+" nouveau"+(tot.mAdd>1?"x":"")+")"+(err?" — "+err+" ville"+(err>1?"s":"")+" sans réponse.":"."));
+    }catch(e){
+      setSearchStatus("error","Erreur lors de la recherche : "+msgErreur(e)+".");
+    }finally{
+      zoneRun=false;zoneAbort=false;setSearching(false);
+    }
+  })();
+}
+var zoneRun=false;
+$("#citySearchBtn").addEventListener("click",function(){searchZone($("#citySearch").value);});
+$("#citySearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchZone($("#citySearch").value);}});
+$("#cityGroups").addEventListener("click",onCityGroupsClick);
+$("#cityGroupsMand").addEventListener("click",onCityGroupsClick);
+$("#tabAgence").addEventListener("click",function(){showResultTab("agence");});
+$("#tabMand").addEventListener("click",function(){showResultTab("mandataire");});
+
+var editing=null;
+function openSheet(f){
+  editing=f?f.id:null;
+  $("#sTitle").textContent=f?"Modifier la fiche":"Nouvelle fiche";
+  $("#f_type").value=f?(f.type||"agence"):"agence";
+  $("#f_nom").value=f?(f.nom||""):"";
+  $("#f_contact").value=f?(f.contact||""):"";
+  $("#f_adresse").value=f?(f.adresse||""):"";
+  $("#f_ville").value=f?(f.ville||""):"";
+  $("#f_tel").value=f?(f.tel||""):"";
+  $("#f_email").value=f?(f.email||""):"";
+  $("#f_canal").value=f?(f.canal||"visite"):"visite";
+  $("#f_date").value=f?(f.date||""):iso(new Date());
+  $("#f_relance").value=f?(f.relance||""):"";
+  $("#f_statut").value=f?statutValide(f.statut):"a_contacter";
+  $("#f_notes").value=f?(f.notes||""):"";
+  $("#del").style.display=f?"":"none";
+  var sh=$("#sheet");
+  sheetPrevFocus=document.activeElement;
+  sh.removeAttribute("inert");sh.setAttribute("aria-hidden","false");
+  sh.classList.add("open");$("#scrim").classList.add("show");
+  setTimeout(function(){try{$("#f_type").focus({preventScroll:true});}catch(e){}},30);
+}
+var sheetPrevFocus=null;
+function sheetOuvert(){return $("#sheet").classList.contains("open");}
+function closeSheet(){
+  var sh=$("#sheet");
+  sh.classList.remove("open");$("#scrim").classList.remove("show");editing=null;
+  sh.setAttribute("aria-hidden","true");sh.setAttribute("inert","");
+  var pf=sheetPrevFocus;sheetPrevFocus=null;
+  if(pf&&pf.focus&&document.contains(pf)){try{pf.focus({preventScroll:true});}catch(e){}}
+}
+document.addEventListener("keydown",function(e){if((e.key==="Escape"||e.key==="Esc")&&sheetOuvert()){e.preventDefault();closeSheet();}});
+
+$("#add").addEventListener("click",function(){openSheet(null);});
+$("#addTop").addEventListener("click",function(){openSheet(null);});
+$("#close").addEventListener("click",closeSheet);
+$("#cancel").addEventListener("click",closeSheet);
+$("#scrim").addEventListener("click",closeSheet);
+/* Recherche : rendu différé pendant la frappe (listes longues). */
+var ROWS_STEP=200,rowsLimit=ROWS_STEP,qT=null;
+function renderFiltre(){rowsLimit=ROWS_STEP;render();}
+$("#q").addEventListener("input",function(){clearTimeout(qT);qT=setTimeout(renderFiltre,150);});
+$("#fType").addEventListener("change",renderFiltre);
+$("#fStat").addEventListener("change",renderFiltre);
+$("#moreRows").addEventListener("click",function(){rowsLimit+=ROWS_STEP;render();});
+$("#kTotBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kTodoBtn").addEventListener("click",function(){$("#fStat").value="__contactes";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kIntBtn").addEventListener("click",function(){$("#fStat").value="a_rappeler";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kCliBtn").addEventListener("click",function(){$("#fStat").value="client";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kRelBtn").addEventListener("click",function(){$("#fStat").value="sans_suite";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("rows").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#kVillesBtn").addEventListener("click",function(){$("#fStat").value="";$("#fType").value="";$("#q").value="";renderFiltre();document.getElementById("resultTabs").scrollIntoView({behavior:"smooth",block:"start"});});
+
+$("#sheet").addEventListener("submit",function(e){
+  e.preventDefault();
+  var o={
+    type:$("#f_type").value,nom:$("#f_nom").value.trim(),contact:$("#f_contact").value.trim(),
+    adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),tel:$("#f_tel").value.trim(),email:$("#f_email").value.trim(),canal:$("#f_canal").value,
+    date:$("#f_date").value,relance:$("#f_relance").value,statut:statutValide($("#f_statut").value),notes:$("#f_notes").value.trim()
+  };
+  if(!o.nom){$("#f_nom").focus();toast("Indique au moins le nom de la structure ou du secteur");return;}
+  if(o.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.email)){$("#f_email").focus();toast("Adresse e-mail invalide");return;}
+  if(o.date&&!isoOk(o.date))o.date="";if(o.relance&&!isoOk(o.relance))o.relance="";
+  var prevF=null;if(editing){for(var pi=0;pi<fiches.length;pi++)if(fiches[pi].id===editing)prevF=fiches[pi];}
+  /* Type / canal d'une ancienne fiche hors liste : conservés (le menu affichait vide et les effaçait). */
+  if(!o.type&&prevF)o.type=prevF.type;if(!o.canal&&prevF)o.canal=prevF.canal;
+  /* Doublon : même nom dans la même ville (ou même téléphone) déjà en fiche. */
+  if(!editing){
+    var dup=null,nn=norm(o.nom),nv=norm(o.ville),t9=tel9(o.tel);
+    for(var di2=0;di2<fiches.length&&!dup;di2++){var x=fiches[di2];if((nn&&norm(x.nom)===nn&&norm(x.ville)===nv)||(t9&&tel9(x.tel)===t9))dup=x;}
+    if(dup&&!window.confirm("Une fiche semblable existe déjà : « "+(dup.nom||"sans nom")+" »"+(dup.ville?" ("+dup.ville+")":"")+".\n\nCréer quand même une nouvelle fiche ?"))return;
+  }
+  if(o.statut==="client"&&!(prevF&&prevF.statut==="client"))o.autoClient=false;
+  if(editing){
+    o.id=editing;
+    /* Ville modifiée : code postal, département, région et temps de route de
+       l'ancienne ville ne valent plus (recalculés ; CP repris de l'adresse s'il y figure). */
+    var villeChangee=prevF&&norm(prevF.ville)!==norm(o.ville);
+    fiches=fiches.map(function(f){
+      if(f.id!==editing)return f;
+      var nf=Object.assign({},f,o);
+      if(villeChangee){
+        delete nf.dep;delete nf.region;delete nf.trajet;
+        var mcp=String(o.adresse||"").match(/\b(\d{5})\b/);
+        nf.cp=mcp?mcp[1]:"";
+      }
+      return nf;
+    });
+  }else{
+    o.id=uid();fiches.push(o);
+  }
+  if(!persist()){render();return;}
+  render();closeSheet();
+  /* Envoi au calendrier seulement si la relance est nouvelle ou a changé (ou si la fiche
+     est rouverte) : sinon chaque modification (une note…) remettait la relance à 9 h
+     et la repassait « planifiée » dans l'agenda, même déjà traitée. */
+  var ouverte=o.relance&&!STATUTS_CLOS[o.statut];
+  var aEnvoyer=ouverte&&(!prevF||prevF.relance!==o.relance||!!STATUTS_CLOS[prevF.statut]);
+  if(aEnvoyer){if(!sendToAgenda(o))toast("Fiche enregistrée — calendrier indisponible (ouvre la prospection depuis le CRM)");}
+  else toast("Fiche enregistrée");
 });
+
+$("#del").addEventListener("click",function(){
+  if(!editing)return;
+  var fd0=null;for(var di=0;di<fiches.length;di++)if(fiches[di].id===editing)fd0=fiches[di];
+  if(!window.confirm("Supprimer définitivement la fiche « "+((fd0&&fd0.nom)||"sans nom")+" » ?\n\nNotes, relance et historique de cette fiche seront perdus."))return;
+  fiches=fiches.filter(function(f){return f.id!==editing;});
+  persist();render();closeSheet();toast("Fiche supprimée");
+});
+
+$("#rows").addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b)return;
+  var id=b.getAttribute("data-edit")||b.getAttribute("data-cal")||b.getAttribute("data-devis");
+  var f=null;for(var i=0;i<fiches.length;i++)if(fiches[i].id===id)f=fiches[i];
+  if(!f)return;
+  if(b.hasAttribute("data-edit")){openSheet(f);return;}
+  if(b.hasAttribute("data-devis")){createDevisFromFiche(f);return;}
+  sendToAgenda(f);
+});
+
+window.addEventListener("storage",function(e){if(e.key===KEY){clearTimeout(persistT);persistT=null;try{fiches=asFiches(JSON.parse(e.newValue||"[]"));}catch(x){fiches=[];}render();}});
+/* Écriture différée en attente : on la termine avant de quitter / recharger. */
+window.addEventListener("pagehide",function(){if(persistT)persist();});
+render();
+</script>
+</body>
+</html>
