@@ -388,7 +388,6 @@ td{overflow-wrap:anywhere;}
       <div class="field"><label for="f_ville">Ville</label><input class="inp" id="f_ville" placeholder="Bordeaux"></div>
       <div class="field"><label for="f_tel">Téléphone</label><input class="inp" id="f_tel" placeholder="05 56 00 00 00"></div>
     </div>
-    <div class="field"><label for="f_email">E-mail</label><input class="inp" type="email" id="f_email" placeholder="contact@agence.fr" autocomplete="off"></div>
     <div class="field"><label for="f_canal">Canal</label><select class="inp" id="f_canal"></select></div>
     <div class="row2">
       <div class="field"><label for="f_date">Date de visite</label><input class="inp" type="date" id="f_date"></div>
@@ -516,7 +515,7 @@ function render(){
       '<td data-l="Canal">'+esc(lab(CANAUX,f.canal))+"</td>"+
       '<td data-l="Statut">'+statutTag(f)+"</td>"+
       '<td data-l="Relance">'+rel+"</td>"+
-      '<td data-l=""><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+(str(f.email).trim()?'<a class="btn sm" href="mailto:'+esc(str(f.email).trim())+'">Mail</a>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+      '<td data-l=""><div class="acts">'+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
       "</tr>";
   }).join("");
 }
@@ -568,7 +567,7 @@ function sendToAgenda(f){
 function createDevisFromFiche(f){
   var ok=postToShell({__prospToDevis:{
     nom:(f.nom||"")+(f.contact?(" — "+f.contact):""),
-    tel:f.tel||"",email:f.email||"",adresse:f.adresse||"",ville:f.ville||""
+    tel:f.tel||"",adresse:f.adresse||"",ville:f.ville||""
   }});
   if(!ok)toast("Devis indisponible (ouvre la prospection depuis le CRM)");
 }
@@ -796,7 +795,7 @@ function cityGroupsHTML(type,singular,plural,emptyIdleHint){
           '<td data-l="Téléphone">'+(tel?esc(tel):"—")+"</td>"+
           '<td data-l="Adresse">'+esc(f.adresse||"—")+"</td>"+
           '<td data-l="Statut">'+statutTag(f)+"</td>"+
-          '<td data-l=""><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+(str(f.email).trim()?'<a class="btn sm" href="mailto:'+esc(str(f.email).trim())+'">Mail</a>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
+          '<td data-l=""><div class="acts">'+(tel?'<a class="btn sm" href="tel:'+esc(tel.replace(/[^\d+]/g,""))+'">Appeler</a>':"")+(f.relance?'<button class="btn sm" data-cal="'+esc(f.id)+'">Agenda</button>':"")+'<button class="btn sm" data-devis="'+esc(f.id)+'">Devis</button><button class="btn sm" data-edit="'+esc(f.id)+'">Ouvrir</button></div></td>'+
           "</tr>";
       }).join("");
       return '<div class="city-group">'+
@@ -1165,7 +1164,6 @@ function openSheet(f){
   $("#f_adresse").value=f?(f.adresse||""):"";
   $("#f_ville").value=f?(f.ville||""):"";
   $("#f_tel").value=f?(f.tel||""):"";
-  $("#f_email").value=f?(f.email||""):"";
   $("#f_canal").value=f?(f.canal||"visite"):"visite";
   $("#f_date").value=f?(f.date||""):iso(new Date());
   $("#f_relance").value=f?(f.relance||""):"";
@@ -1212,11 +1210,10 @@ $("#sheet").addEventListener("submit",function(e){
   e.preventDefault();
   var o={
     type:$("#f_type").value,nom:$("#f_nom").value.trim(),contact:$("#f_contact").value.trim(),
-    adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),tel:$("#f_tel").value.trim(),email:$("#f_email").value.trim(),canal:$("#f_canal").value,
+    adresse:$("#f_adresse").value.trim(),ville:$("#f_ville").value.trim(),tel:$("#f_tel").value.trim(),canal:$("#f_canal").value,
     date:$("#f_date").value,relance:$("#f_relance").value,statut:statutValide($("#f_statut").value),notes:$("#f_notes").value.trim()
   };
   if(!o.nom){$("#f_nom").focus();toast("Indique au moins le nom de la structure ou du secteur");return;}
-  if(o.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.email)){$("#f_email").focus();toast("Adresse e-mail invalide");return;}
   if(o.date&&!isoOk(o.date))o.date="";if(o.relance&&!isoOk(o.relance))o.relance="";
   var prevF=null;if(editing){for(var pi=0;pi<fiches.length;pi++)if(fiches[pi].id===editing)prevF=fiches[pi];}
   /* Type / canal d'une ancienne fiche hors liste : conservés (le menu affichait vide et les effaçait). */
